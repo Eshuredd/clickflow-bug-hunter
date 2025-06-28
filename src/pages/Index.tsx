@@ -11,31 +11,57 @@ import { Header } from '@/components/Header';
 import { AnalysisResults } from '@/components/AnalysisResults';
 import { TeamWorkspace } from '@/components/TeamWorkspace';
 import { SubscriptionTiers } from '@/components/SubscriptionTiers';
+import { WebsiteAnalyzer, AnalysisResult } from '@/services/websiteAnalyzer';
 
 const Index = () => {
   const [analysisUrl, setAnalysisUrl] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [showResults, setShowResults] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   const handleStartAnalysis = async () => {
     if (!analysisUrl) return;
     
     setIsAnalyzing(true);
     setAnalysisProgress(0);
+    setShowResults(false);
     
-    // Simulate analysis progress
+    // Real analysis with progress tracking
+    const analyzer = new WebsiteAnalyzer();
+    
+    // Simulate progress updates
     const progressInterval = setInterval(() => {
       setAnalysisProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          setIsAnalyzing(false);
-          setShowResults(true);
-          return 100;
+        if (prev >= 90) {
+          return prev;
         }
         return prev + Math.random() * 15;
       });
     }, 500);
+    
+    try {
+      const result = await analyzer.analyzeWebsite(analysisUrl);
+      setAnalysisResult(result);
+      setAnalysisProgress(100);
+      
+      setTimeout(() => {
+        clearInterval(progressInterval);
+        setIsAnalyzing(false);
+        setShowResults(true);
+      }, 500);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      clearInterval(progressInterval);
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleNewAnalysis = () => {
+    setShowResults(false);
+    setAnalysisResult(null);
+    setAnalysisUrl('');
+    setAnalysisProgress(0);
   };
 
   return (
@@ -265,7 +291,11 @@ const Index = () => {
             </Tabs>
           </>
         ) : (
-          <AnalysisResults url={analysisUrl} />
+          <AnalysisResults 
+            url={analysisUrl} 
+            result={analysisResult}
+            onNewAnalysis={handleNewAnalysis}
+          />
         )}
       </main>
     </div>
