@@ -1,0 +1,1 @@
+{"root":["./src/app.ts","./src/server.ts","./src/routes/analysis.ts","./src/services/bugdetectionservice.ts"],"errors":true,"version":"5.8.3"}
