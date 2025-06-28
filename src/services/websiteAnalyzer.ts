@@ -24,14 +24,29 @@ export class WebsiteAnalyzer {
     console.log(`Starting analysis for: ${url}`);
     
     try {
-      // Simulate actual website analysis
-      const response = await this.fetchWebsiteContent(url);
-      const bugs = await this.detectBugs(url, response);
+      // Call the actual backend API
+      const response = await fetch('/api/analysis/button-clicks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend analysis failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const backendResults = data.results;
+      
+      // Convert backend results to our bug format
+      const bugs = this.convertBackendResultsToBugs(backendResults);
       const analysisTime = (Date.now() - startTime) / 1000;
       
       return {
         url,
-        totalElements: Math.floor(Math.random() * 200) + 50, // Simulate element count
+        totalElements: backendResults.length, // Use actual count from backend
         bugs,
         analysisTime,
         pagesScanned: [url]
@@ -48,31 +63,37 @@ export class WebsiteAnalyzer {
     }
   }
 
-  private async fetchWebsiteContent(url: string): Promise<string> {
-    try {
-      // In a real implementation, this would use a proxy service or backend
-      // For now, we'll simulate the analysis based on URL patterns
-      console.log(`Fetching content from: ${url}`);
-      
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      return `Simulated content for ${url}`;
-    } catch (error) {
-      throw new Error(`Failed to fetch website content: ${error}`);
-    }
-  }
-
-  private async detectBugs(url: string, content: string): Promise<DetectedBug[]> {
+  private convertBackendResultsToBugs(backendResults: any[]): DetectedBug[] {
     const bugs: DetectedBug[] = [];
     
-    // Real analysis logic would go here
-    // For now, we'll return empty array to show no bugs found
-    console.log(`Analyzing ${url} - No clickable element bugs detected`);
-    
-    // Only return bugs if we actually find issues
-    // This prevents showing false positives like the mock data was doing
+    backendResults.forEach((result, index) => {
+      if (result.bugType) {
+        bugs.push({
+          id: index + 1,
+          page: result.urlBefore,
+          element: result.textContent || result.selector,
+          type: result.bugType,
+          severity: this.getSeverityFromBugType(result.bugType),
+          description: result.description || `Issue detected with ${result.elementType}`,
+          context: `Element: ${result.selector}, Type: ${result.elementType}, Visible: ${result.isVisible}`,
+          aiVerified: true
+        });
+      }
+    });
     
     return bugs;
+  }
+
+  private getSeverityFromBugType(bugType: string): 'Critical' | 'High' | 'Medium' | 'Low' {
+    switch (bugType) {
+      case 'ClickError':
+      case 'NoAction':
+        return 'High';
+      case 'NotVisible':
+      case 'NotClickable':
+        return 'Medium';
+      default:
+        return 'Low';
+    }
   }
 }
