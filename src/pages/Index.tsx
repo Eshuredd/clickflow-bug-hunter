@@ -1,12 +1,273 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertTriangle, CheckCircle, Clock, Zap, Users, Globe, FileText, Settings } from 'lucide-react';
+import { Header } from '@/components/Header';
+import { AnalysisResults } from '@/components/AnalysisResults';
+import { TeamWorkspace } from '@/components/TeamWorkspace';
+import { SubscriptionTiers } from '@/components/SubscriptionTiers';
 
 const Index = () => {
+  const [analysisUrl, setAnalysisUrl] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [showResults, setShowResults] = useState(false);
+
+  const handleStartAnalysis = async () => {
+    if (!analysisUrl) return;
+    
+    setIsAnalyzing(true);
+    setAnalysisProgress(0);
+    
+    // Simulate analysis progress
+    const progressInterval = setInterval(() => {
+      setAnalysisProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          setIsAnalyzing(false);
+          setShowResults(true);
+          return 100;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 500);
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <Header />
+      
+      <main className="container mx-auto px-4 py-8">
+        {!showResults ? (
+          <>
+            {/* Hero Section */}
+            <div className="text-center mb-12">
+              <h1 className="text-5xl font-bold text-white mb-4">
+                AI-Powered Bug Detection Platform
+              </h1>
+              <p className="text-xl text-slate-300 mb-8 max-w-3xl mx-auto">
+                Systematically identify clickable element bugs across websites with intelligent AI analysis, 
+                comprehensive reporting, and seamless team collaboration.
+              </p>
+              
+              {/* Analysis Input */}
+              <Card className="max-w-2xl mx-auto bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    Start Website Analysis
+                  </CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Enter a URL to begin comprehensive clickable element testing
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://example.com"
+                      value={analysisUrl}
+                      onChange={(e) => setAnalysisUrl(e.target.value)}
+                      className="flex-1 bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                    />
+                    <Button 
+                      onClick={handleStartAnalysis}
+                      disabled={!analysisUrl || isAnalyzing}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Clock className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-4 w-4 mr-2" />
+                          Start Analysis
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {isAnalyzing && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm text-slate-300">
+                        <span>Scanning clickable elements...</span>
+                        <span>{Math.round(analysisProgress)}%</span>
+                      </div>
+                      <Progress value={analysisProgress} className="h-2" />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Feature Overview */}
+            <div className="grid md:grid-cols-3 gap-6 mb-12">
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                    Advanced Detection
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-slate-300">
+                    Multi-layer scanning of buttons, links, forms, and interactive components 
+                    with JavaScript error detection and accessibility compliance.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                    AI Verification
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-slate-300">
+                    Gemini AI integration for content matching verification, context analysis, 
+                    and automated severity classification with false positive reduction.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-400" />
+                    Team Collaboration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-slate-300">
+                    Multi-user workspaces with role-based permissions, bug assignment, 
+                    tracking, and integration with GitHub, Jira, and Slack.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Platform Tabs */}
+            <Tabs defaultValue="dashboard" className="w-full">
+              <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-slate-700">
+                <TabsTrigger value="dashboard" className="data-[state=active]:bg-slate-700">
+                  Dashboard
+                </TabsTrigger>
+                <TabsTrigger value="workspace" className="data-[state=active]:bg-slate-700">
+                  Team Workspace
+                </TabsTrigger>
+                <TabsTrigger value="reports" className="data-[state=active]:bg-slate-700">
+                  Reports
+                </TabsTrigger>
+                <TabsTrigger value="pricing" className="data-[state=active]:bg-slate-700">
+                  Pricing
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="dashboard" className="space-y-6">
+                <div className="grid md:grid-cols-4 gap-6">
+                  <Card className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-slate-400 text-sm">Total Analyses</p>
+                          <p className="text-2xl font-bold text-white">1,247</p>
+                        </div>
+                        <Globe className="h-8 w-8 text-blue-400" />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-slate-400 text-sm">Bugs Detected</p>
+                          <p className="text-2xl font-bold text-white">3,891</p>
+                        </div>
+                        <AlertTriangle className="h-8 w-8 text-red-400" />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-slate-400 text-sm">Accuracy Rate</p>
+                          <p className="text-2xl font-bold text-white">96.8%</p>
+                        </div>
+                        <CheckCircle className="h-8 w-8 text-green-400" />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-slate-400 text-sm">Active Teams</p>
+                          <p className="text-2xl font-bold text-white">23</p>
+                        </div>
+                        <Users className="h-8 w-8 text-purple-400" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="workspace">
+                <TeamWorkspace />
+              </TabsContent>
+
+              <TabsContent value="reports">
+                <Card className="bg-slate-800/50 border-slate-700">
+                  <CardHeader>
+                    <CardTitle className="text-white flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Analysis Reports
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">
+                      Comprehensive reports with detailed bug analysis and recommendations
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
+                          <div>
+                            <h4 className="text-white font-medium">Website Analysis #{i}</h4>
+                            <p className="text-slate-400 text-sm">example{i}.com • 42 bugs found</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="destructive">High Priority</Badge>
+                            <Button size="sm" variant="outline">
+                              View Report
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="pricing">
+                <SubscriptionTiers />
+              </TabsContent>
+            </Tabs>
+          </>
+        ) : (
+          <AnalysisResults url={analysisUrl} />
+        )}
+      </main>
     </div>
   );
 };
