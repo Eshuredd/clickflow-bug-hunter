@@ -26,6 +26,7 @@ import { AnalysisResults } from "@/components/AnalysisResults";
 import { TeamWorkspace } from "@/components/TeamWorkspace";
 import { SubscriptionTiers } from "@/components/SubscriptionTiers";
 import { WebsiteAnalyzer, AnalysisResult } from "@/services/websiteAnalyzer";
+import { ScanningProgressDialog } from "@/components/ScanningProgressDialog";
 
 const Index = () => {
   const [analysisUrl, setAnalysisUrl] = useState("");
@@ -35,6 +36,7 @@ const Index = () => {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
     null
   );
+  const [showScanningDialog, setShowScanningDialog] = useState(false);
 
   const handleStartAnalysis = async () => {
     if (!analysisUrl) return;
@@ -42,6 +44,7 @@ const Index = () => {
     setIsAnalyzing(true);
     setAnalysisProgress(0);
     setShowResults(false);
+    setShowScanningDialog(true); // Show the scanning popup
 
     // Real analysis with progress tracking
     const analyzer = new WebsiteAnalyzer();
@@ -64,12 +67,14 @@ const Index = () => {
       setTimeout(() => {
         clearInterval(progressInterval);
         setIsAnalyzing(false);
+        setShowScanningDialog(false); // Hide the scanning popup
         setShowResults(true);
-      }, 500);
+      }, 1000); // Give a moment to see 100% completion
     } catch (error) {
       console.error("Analysis failed:", error);
       clearInterval(progressInterval);
       setIsAnalyzing(false);
+      setShowScanningDialog(false);
     }
   };
 
@@ -78,6 +83,7 @@ const Index = () => {
     setAnalysisResult(null);
     setAnalysisUrl("");
     setAnalysisProgress(0);
+    setShowScanningDialog(false);
   };
 
   return (
@@ -135,16 +141,6 @@ const Index = () => {
                       )}
                     </Button>
                   </div>
-
-                  {isAnalyzing && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm text-slate-300">
-                        <span>ble elements...</span>
-                        <span>{Math.round(analysisProgress)}%</span>
-                      </div>
-                      <Progress value={analysisProgress} className="h-2" />
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             </div>
@@ -343,6 +339,15 @@ const Index = () => {
             onNewAnalysis={handleNewAnalysis}
           />
         )}
+
+        {/* Scanning Progress Dialog */}
+        <ScanningProgressDialog
+          isOpen={showScanningDialog}
+          onOpenChange={setShowScanningDialog}
+          url={analysisUrl}
+          progress={analysisProgress}
+          isScanning={isAnalyzing}
+        />
       </main>
     </div>
   );
