@@ -1,57 +1,73 @@
-
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertTriangle, CheckCircle, Clock, Zap, Users, Globe, FileText, Settings } from 'lucide-react';
-import { Header } from '@/components/Header';
-import { AnalysisResults } from '@/components/AnalysisResults';
-import { TeamWorkspace } from '@/components/TeamWorkspace';
-import { SubscriptionTiers } from '@/components/SubscriptionTiers';
-import { WebsiteAnalyzer, AnalysisResult } from '@/services/websiteAnalyzer';
+import { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Zap,
+  Users,
+  Globe,
+  FileText,
+  Settings,
+} from "lucide-react";
+import { Header } from "@/components/Header";
+import { AnalysisResults } from "@/components/AnalysisResults";
+import { TeamWorkspace } from "@/components/TeamWorkspace";
+import { SubscriptionTiers } from "@/components/SubscriptionTiers";
+import { WebsiteAnalyzer, AnalysisResult } from "@/services/websiteAnalyzer";
 
 const Index = () => {
-  const [analysisUrl, setAnalysisUrl] = useState('');
+  const [analysisUrl, setAnalysisUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [showResults, setShowResults] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
+    null
+  );
 
   const handleStartAnalysis = async () => {
     if (!analysisUrl) return;
-    
+
     setIsAnalyzing(true);
     setAnalysisProgress(0);
     setShowResults(false);
-    
+
     // Real analysis with progress tracking
     const analyzer = new WebsiteAnalyzer();
-    
+
     // Simulate progress updates
     const progressInterval = setInterval(() => {
-      setAnalysisProgress(prev => {
+      setAnalysisProgress((prev) => {
         if (prev >= 90) {
           return prev;
         }
         return prev + Math.random() * 15;
       });
     }, 500);
-    
+
     try {
       const result = await analyzer.analyzeWebsite(analysisUrl);
       setAnalysisResult(result);
       setAnalysisProgress(100);
-      
+
       setTimeout(() => {
         clearInterval(progressInterval);
         setIsAnalyzing(false);
         setShowResults(true);
       }, 500);
     } catch (error) {
-      console.error('Analysis failed:', error);
+      console.error("Analysis failed:", error);
       clearInterval(progressInterval);
       setIsAnalyzing(false);
     }
@@ -60,14 +76,14 @@ const Index = () => {
   const handleNewAnalysis = () => {
     setShowResults(false);
     setAnalysisResult(null);
-    setAnalysisUrl('');
+    setAnalysisUrl("");
     setAnalysisProgress(0);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <Header />
-      
+
       <main className="container mx-auto px-4 py-8">
         {!showResults ? (
           <>
@@ -77,10 +93,11 @@ const Index = () => {
                 AI-Powered Bug Detection Platform
               </h1>
               <p className="text-xl text-slate-300 mb-8 max-w-3xl mx-auto">
-                Systematically identify clickable element bugs across websites with intelligent AI analysis, 
-                comprehensive reporting, and seamless team collaboration.
+                Systematically identify clickable element bugs across websites
+                with intelligent AI analysis, comprehensive reporting, and
+                seamless team collaboration.
               </p>
-              
+
               {/* Analysis Input */}
               <Card className="max-w-2xl mx-auto bg-slate-800/50 border-slate-700">
                 <CardHeader>
@@ -100,7 +117,7 @@ const Index = () => {
                       onChange={(e) => setAnalysisUrl(e.target.value)}
                       className="flex-1 bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
                     />
-                    <Button 
+                    <Button
                       onClick={handleStartAnalysis}
                       disabled={!analysisUrl || isAnalyzing}
                       className="bg-blue-600 hover:bg-blue-700"
@@ -118,11 +135,11 @@ const Index = () => {
                       )}
                     </Button>
                   </div>
-                  
+
                   {isAnalyzing && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm text-slate-300">
-                        <span>Scanning clickable elements...</span>
+                        <span>ble elements...</span>
                         <span>{Math.round(analysisProgress)}%</span>
                       </div>
                       <Progress value={analysisProgress} className="h-2" />
@@ -143,8 +160,9 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-slate-300">
-                    Multi-layer scanning of buttons, links, forms, and interactive components 
-                    with JavaScript error detection and accessibility compliance.
+                    Multi-layer scanning of buttons, links, forms, and
+                    interactive components with JavaScript error detection and
+                    accessibility compliance.
                   </p>
                 </CardContent>
               </Card>
@@ -158,8 +176,9 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-slate-300">
-                    Gemini AI integration for content matching verification, context analysis, 
-                    and automated severity classification with false positive reduction.
+                    Gemini AI integration for content matching verification,
+                    context analysis, and automated severity classification with
+                    false positive reduction.
                   </p>
                 </CardContent>
               </Card>
@@ -173,8 +192,9 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-slate-300">
-                    Multi-user workspaces with role-based permissions, bug assignment, 
-                    tracking, and integration with GitHub, Jira, and Slack.
+                    Multi-user workspaces with role-based permissions, bug
+                    assignment, tracking, and integration with GitHub, Jira, and
+                    Slack.
                   </p>
                 </CardContent>
               </Card>
@@ -183,16 +203,28 @@ const Index = () => {
             {/* Platform Tabs */}
             <Tabs defaultValue="dashboard" className="w-full">
               <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-slate-700">
-                <TabsTrigger value="dashboard" className="data-[state=active]:bg-slate-700">
+                <TabsTrigger
+                  value="dashboard"
+                  className="data-[state=active]:bg-slate-700"
+                >
                   Dashboard
                 </TabsTrigger>
-                <TabsTrigger value="workspace" className="data-[state=active]:bg-slate-700">
+                <TabsTrigger
+                  value="workspace"
+                  className="data-[state=active]:bg-slate-700"
+                >
                   Team Workspace
                 </TabsTrigger>
-                <TabsTrigger value="reports" className="data-[state=active]:bg-slate-700">
+                <TabsTrigger
+                  value="reports"
+                  className="data-[state=active]:bg-slate-700"
+                >
                   Reports
                 </TabsTrigger>
-                <TabsTrigger value="pricing" className="data-[state=active]:bg-slate-700">
+                <TabsTrigger
+                  value="pricing"
+                  className="data-[state=active]:bg-slate-700"
+                >
                   Pricing
                 </TabsTrigger>
               </TabsList>
@@ -203,7 +235,9 @@ const Index = () => {
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-slate-400 text-sm">Total Analyses</p>
+                          <p className="text-slate-400 text-sm">
+                            Total Analyses
+                          </p>
                           <p className="text-2xl font-bold text-white">1,247</p>
                         </div>
                         <Globe className="h-8 w-8 text-blue-400" />
@@ -215,7 +249,9 @@ const Index = () => {
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-slate-400 text-sm">Bugs Detected</p>
+                          <p className="text-slate-400 text-sm">
+                            Bugs Detected
+                          </p>
                           <p className="text-2xl font-bold text-white">3,891</p>
                         </div>
                         <AlertTriangle className="h-8 w-8 text-red-400" />
@@ -227,7 +263,9 @@ const Index = () => {
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-slate-400 text-sm">Accuracy Rate</p>
+                          <p className="text-slate-400 text-sm">
+                            Accuracy Rate
+                          </p>
                           <p className="text-2xl font-bold text-white">96.8%</p>
                         </div>
                         <CheckCircle className="h-8 w-8 text-green-400" />
@@ -261,16 +299,24 @@ const Index = () => {
                       Analysis Reports
                     </CardTitle>
                     <CardDescription className="text-slate-400">
-                      Comprehensive reports with detailed bug analysis and recommendations
+                      Comprehensive reports with detailed bug analysis and
+                      recommendations
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
                       {[1, 2, 3].map((i) => (
-                        <div key={i} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
+                        <div
+                          key={i}
+                          className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg"
+                        >
                           <div>
-                            <h4 className="text-white font-medium">Website Analysis #{i}</h4>
-                            <p className="text-slate-400 text-sm">example{i}.com • 42 bugs found</p>
+                            <h4 className="text-white font-medium">
+                              Website Analysis #{i}
+                            </h4>
+                            <p className="text-slate-400 text-sm">
+                              example{i}.com • 42 bugs found
+                            </p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="destructive">High Priority</Badge>
@@ -291,8 +337,8 @@ const Index = () => {
             </Tabs>
           </>
         ) : (
-          <AnalysisResults 
-            url={analysisUrl} 
+          <AnalysisResults
+            url={analysisUrl}
             result={analysisResult}
             onNewAnalysis={handleNewAnalysis}
           />
