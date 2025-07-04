@@ -113,7 +113,7 @@ const Index = () => {
                 <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center">
                   <span className="text-cream font-bold text-lg">CB</span>
                 </div>
-                <h1 className="text-4xl font-bold text-foreground">ClickBug Detector</h1>
+                <h1 className="text-4xl font-bold text-foreground">Aigis Adaptive AI</h1>
               </div>
               
               <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
