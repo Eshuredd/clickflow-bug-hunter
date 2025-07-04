@@ -27,8 +27,10 @@ import { TeamWorkspace } from "@/components/TeamWorkspace";
 import { SubscriptionTiers } from "@/components/SubscriptionTiers";
 import { WebsiteAnalyzer, AnalysisResult } from "@/services/websiteAnalyzer";
 import { ScanningProgressDialog } from "@/components/ScanningProgressDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
+  const { user } = useAuth();
   const [analysisUrl, setAnalysisUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -44,12 +46,10 @@ const Index = () => {
     setIsAnalyzing(true);
     setAnalysisProgress(0);
     setShowResults(false);
-    setShowScanningDialog(true); // Show the scanning popup
+    setShowScanningDialog(true);
 
-    // Real analysis with progress tracking
     const analyzer = new WebsiteAnalyzer();
 
-    // Simulate progress updates
     const progressInterval = setInterval(() => {
       setAnalysisProgress((prev) => {
         if (prev >= 90) {
@@ -67,9 +67,9 @@ const Index = () => {
       setTimeout(() => {
         clearInterval(progressInterval);
         setIsAnalyzing(false);
-        setShowScanningDialog(false); // Hide the scanning popup
+        setShowScanningDialog(false);
         setShowResults(true);
-      }, 1000); // Give a moment to see 100% completion
+      }, 1000);
     } catch (error) {
       console.error("Analysis failed:", error);
       clearInterval(progressInterval);
@@ -113,6 +113,11 @@ const Index = () => {
                   </CardTitle>
                   <CardDescription className="text-slate-400">
                     Enter a URL to begin comprehensive clickable element testing
+                    {!user && (
+                      <span className="block mt-1 text-yellow-400">
+                        • Free tier: 5 analyses per month, 10 elements per scan
+                      </span>
+                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -141,6 +146,14 @@ const Index = () => {
                       )}
                     </Button>
                   </div>
+                  {!user && (
+                    <p className="text-sm text-slate-400 text-center">
+                      No account required for basic analysis. 
+                      <Button variant="link" className="text-blue-400 p-0 h-auto font-normal" onClick={() => window.location.href = '/auth'}>
+                        Sign in for unlimited access
+                      </Button>
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -152,6 +165,7 @@ const Index = () => {
                   <CardTitle className="text-white flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-red-400" />
                     Advanced Detection
+                    {!user && <Badge variant="outline" className="ml-2 text-xs">Free</Badge>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -168,6 +182,7 @@ const Index = () => {
                   <CardTitle className="text-white flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-green-400" />
                     AI Verification
+                    <Badge variant="secondary" className="ml-2 text-xs bg-blue-600">Premium</Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -176,6 +191,11 @@ const Index = () => {
                     context analysis, and automated severity classification with
                     false positive reduction.
                   </p>
+                  {!user && (
+                    <p className="text-yellow-400 text-sm mt-2">
+                      Sign in to access AI verification features
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -184,6 +204,7 @@ const Index = () => {
                   <CardTitle className="text-white flex items-center gap-2">
                     <Users className="h-5 w-5 text-blue-400" />
                     Team Collaboration
+                    <Badge variant="secondary" className="ml-2 text-xs bg-blue-600">Premium</Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -192,6 +213,11 @@ const Index = () => {
                     assignment, tracking, and integration with GitHub, Jira, and
                     Slack.
                   </p>
+                  {!user && (
+                    <p className="text-yellow-400 text-sm mt-2">
+                      Sign in to access team collaboration features
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -210,6 +236,7 @@ const Index = () => {
                   className="data-[state=active]:bg-slate-700"
                 >
                   Team Workspace
+                  {!user && <Badge variant="outline" className="ml-1 text-xs">Premium</Badge>}
                 </TabsTrigger>
                 <TabsTrigger
                   value="reports"
@@ -234,7 +261,12 @@ const Index = () => {
                           <p className="text-slate-400 text-sm">
                             Total Analyses
                           </p>
-                          <p className="text-2xl font-bold text-white">1,247</p>
+                          <p className="text-2xl font-bold text-white">
+                            {user ? "1,247" : "5"}
+                          </p>
+                          {!user && (
+                            <p className="text-xs text-slate-500">Free tier limit</p>
+                          )}
                         </div>
                         <Globe className="h-8 w-8 text-blue-400" />
                       </div>
@@ -248,7 +280,9 @@ const Index = () => {
                           <p className="text-slate-400 text-sm">
                             Bugs Detected
                           </p>
-                          <p className="text-2xl font-bold text-white">3,891</p>
+                          <p className="text-2xl font-bold text-white">
+                            {user ? "3,891" : "47"}
+                          </p>
                         </div>
                         <AlertTriangle className="h-8 w-8 text-red-400" />
                       </div>
@@ -262,7 +296,12 @@ const Index = () => {
                           <p className="text-slate-400 text-sm">
                             Accuracy Rate
                           </p>
-                          <p className="text-2xl font-bold text-white">96.8%</p>
+                          <p className="text-2xl font-bold text-white">
+                            {user ? "96.8%" : "92.1%"}
+                          </p>
+                          {!user && (
+                            <p className="text-xs text-yellow-400">AI boost with Premium</p>
+                          )}
                         </div>
                         <CheckCircle className="h-8 w-8 text-green-400" />
                       </div>
@@ -274,7 +313,12 @@ const Index = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-slate-400 text-sm">Active Teams</p>
-                          <p className="text-2xl font-bold text-white">23</p>
+                          <p className="text-2xl font-bold text-white">
+                            {user ? "23" : "0"}
+                          </p>
+                          {!user && (
+                            <p className="text-xs text-slate-500">Premium feature</p>
+                          )}
                         </div>
                         <Users className="h-8 w-8 text-purple-400" />
                       </div>
@@ -284,7 +328,25 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="workspace">
-                <TeamWorkspace />
+                {user ? (
+                  <TeamWorkspace />
+                ) : (
+                  <Card className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-12 text-center">
+                      <Users className="h-16 w-16 text-slate-600 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-white mb-2">Team Workspace</h3>
+                      <p className="text-slate-400 mb-6">
+                        Collaborate with your team, assign bugs, and track progress with our premium team features.
+                      </p>
+                      <Button 
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => window.location.href = '/auth'}
+                      >
+                        Sign In to Access Team Features
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
 
               <TabsContent value="reports">
@@ -311,7 +373,7 @@ const Index = () => {
                               Website Analysis #{i}
                             </h4>
                             <p className="text-slate-400 text-sm">
-                              example{i}.com • 42 bugs found
+                              example{i}.com • {user ? "42" : "12"} bugs found
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -323,6 +385,14 @@ const Index = () => {
                         </div>
                       ))}
                     </div>
+                    {!user && (
+                      <div className="mt-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                        <p className="text-blue-300 text-sm">
+                          <strong>Premium users get:</strong> Advanced reporting, PDF exports, 
+                          custom templates, and detailed analytics
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
