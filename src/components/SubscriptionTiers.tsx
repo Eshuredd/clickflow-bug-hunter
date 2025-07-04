@@ -3,8 +3,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Zap, Users, Crown } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 export const SubscriptionTiers = () => {
+  const { userSubscription } = useAuth();
+  const { toast } = useToast();
+  
+  const currentTier = userSubscription?.subscription_tier || 'Free';
+
+  const handleUpgrade = (planName: string) => {
+    toast({
+      title: "Upgrade Feature",
+      description: `Upgrade to ${planName} will be available soon. Contact support for early access.`,
+    });
+  };
+
   const plans = [
     {
       name: 'Free',
@@ -20,8 +34,9 @@ export const SubscriptionTiers = () => {
       ],
       icon: CheckCircle,
       color: 'text-green-400',
-      buttonText: 'Current Plan',
-      buttonVariant: 'outline' as const
+      buttonText: currentTier === 'Free' ? 'Current Plan' : 'Downgrade',
+      buttonVariant: 'outline' as const,
+      isCurrent: currentTier === 'Free'
     },
     {
       name: 'Professional',
@@ -39,9 +54,10 @@ export const SubscriptionTiers = () => {
       ],
       icon: Zap,
       color: 'text-blue-400',
-      buttonText: 'Upgrade Now',
-      buttonVariant: 'default' as const,
-      popular: true
+      buttonText: currentTier === 'Professional' ? 'Current Plan' : 'Upgrade Now',
+      buttonVariant: currentTier === 'Professional' ? 'outline' as 'outline' : 'default' as 'default',
+      popular: true,
+      isCurrent: currentTier === 'Professional'
     },
     {
       name: 'Enterprise',
@@ -61,8 +77,9 @@ export const SubscriptionTiers = () => {
       ],
       icon: Crown,
       color: 'text-purple-400',
-      buttonText: 'Contact Sales',
-      buttonVariant: 'outline' as const
+      buttonText: currentTier === 'Enterprise' ? 'Current Plan' : 'Contact Sales',
+      buttonVariant: 'outline' as const,
+      isCurrent: currentTier === 'Enterprise'
     }
   ];
 
@@ -72,7 +89,7 @@ export const SubscriptionTiers = () => {
         <h2 className="text-3xl font-bold text-white mb-4">Choose Your Plan</h2>
         <p className="text-slate-400 max-w-2xl mx-auto">
           Scale your bug detection capabilities with plans designed for individuals, 
-          teams, and enterprises
+          teams, and enterprises. You're currently on the <strong>{currentTier}</strong> plan.
         </p>
       </div>
 
@@ -80,10 +97,15 @@ export const SubscriptionTiers = () => {
         {plans.map((plan, index) => (
           <Card key={index} className={`bg-slate-800/50 border-slate-700 relative ${
             plan.popular ? 'ring-2 ring-blue-500/50' : ''
-          }`}>
-            {plan.popular && (
+          } ${plan.isCurrent ? 'ring-2 ring-green-500/50' : ''}`}>
+            {plan.popular && !plan.isCurrent && (
               <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white">
                 Most Popular
+              </Badge>
+            )}
+            {plan.isCurrent && (
+              <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-green-600 text-white">
+                Current Plan
               </Badge>
             )}
             
@@ -118,6 +140,8 @@ export const SubscriptionTiers = () => {
                     : 'border-slate-600 text-slate-300 hover:bg-slate-700'
                 }`}
                 variant={plan.buttonVariant}
+                disabled={plan.isCurrent}
+                onClick={() => !plan.isCurrent && handleUpgrade(plan.name)}
               >
                 {plan.buttonText}
               </Button>
