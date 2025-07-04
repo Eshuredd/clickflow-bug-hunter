@@ -1419,8 +1419,14 @@ export async function analyzeButtonClicks(
         const stateBefore = await page.evaluate(() => ({
           htmlLength: document.body.outerHTML.length,
           expanded: Array.from(
-            document.querySelectorAll("[aria-expanded]")
-          ).map((el) => el.getAttribute("aria-expanded")),
+            document.querySelectorAll(
+              "[aria-expanded], [data-state], .expanded, .collapsed, .open, .closed"
+            )
+          ).map((el) => ({
+            expanded: el.getAttribute("aria-expanded"),
+            state: el.getAttribute("data-state"),
+            classList: Array.from(el.classList).join(" "),
+          })),
           textContent: document.body.innerText,
         }));
         // Use robust click implementation with fallbacks
@@ -1489,31 +1495,41 @@ export async function analyzeButtonClicks(
             continue;
           }
         }
-        // After click, quick check for UI changes - reduced wait time
+        // After click, quick check for UI changes
         await new Promise((res) => setTimeout(res, 300));
         const stateAfter = await page.evaluate(() => ({
           htmlLength: document.body.outerHTML.length,
           expanded: Array.from(
-            document.querySelectorAll("[aria-expanded]")
-          ).map((el) => el.getAttribute("aria-expanded")),
+            document.querySelectorAll(
+              "[aria-expanded], [data-state], .expanded, .collapsed, .open, .closed"
+            )
+          ).map((el) => ({
+            expanded: el.getAttribute("aria-expanded"),
+            state: el.getAttribute("data-state"),
+            classList: Array.from(el.classList).join(" "),
+          })),
           textContent: document.body.innerText,
         }));
+
         const htmlDiff = Math.abs(
           stateBefore.htmlLength - stateAfter.htmlLength
         );
         let contentChanged = false;
+
+        // Enhanced dropdown state detection
+        const dropdownStateChanged =
+          JSON.stringify(stateBefore.expanded) !==
+          JSON.stringify(stateAfter.expanded);
+
         if (detectionLevel === "expert") {
           contentChanged =
             htmlDiff > 20 ||
             stateBefore.textContent !== stateAfter.textContent ||
-            JSON.stringify(stateBefore.expanded) !==
-              JSON.stringify(stateAfter.expanded);
+            dropdownStateChanged;
         } else {
-          // fallback to previous logic for other levels
           contentChanged =
             stateBefore.htmlLength !== stateAfter.htmlLength ||
-            JSON.stringify(stateBefore.expanded) !==
-              JSON.stringify(stateAfter.expanded);
+            dropdownStateChanged;
         }
         if (!navigated && !error && !contentChanged) {
           const isLinkToCurrentPage =
