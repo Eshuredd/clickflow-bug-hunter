@@ -173,7 +173,7 @@ router.post("/button-clicks", async (req: any, res: any) => {
   if (!url) return res.status(400).json({ error: "URL is required" });
 
   // Set response timeout to prevent gateway timeouts
-  const timeoutMs = 90000; // 90 seconds (allow time for Puppeteer operations)
+  const timeoutMs = 150000; // 2.5 minutes (allow time for Puppeteer operations with retries)
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(
       () =>

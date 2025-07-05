@@ -2243,33 +2243,58 @@ export async function analyzeButtonClicks(
 
   while (attempt < maxRetries) {
     try {
-      // Docker-compatible Puppeteer configuration with enhanced stability
+      // Minimal Chrome configuration to avoid Network.enable timeout
       const puppeteerConfig: any = {
         headless: true,
         defaultViewport: { width: 1366, height: 768 },
         args: [
+          // Essential security flags
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
-          "--disable-accelerated-2d-canvas",
+
+          // Disable network features that cause timeouts
+          "--disable-features=NetworkService",
+          "--disable-features=NetworkServiceLogging",
+          "--disable-network-service-logging",
+          "--disable-logging",
+          "--disable-extensions",
+          "--disable-plugins",
+          "--disable-background-networking",
+          "--disable-background-timer-throttling",
+          "--disable-backgrounding-occluded-windows",
+          "--disable-renderer-backgrounding",
+          "--disable-default-apps",
+          "--disable-sync",
+          "--disable-translate",
+          "--disable-web-security",
+          "--disable-features=TranslateUI",
+          "--disable-ipc-flooding-protection",
+          "--disable-client-side-phishing-detection",
+          "--disable-hang-monitor",
+          "--disable-popup-blocking",
+          "--disable-prompt-on-repost",
+          "--disable-web-resources",
+          "--disable-permissions-api",
+          "--disable-notifications",
+          "--disable-desktop-notifications",
+          "--disable-file-system",
+          "--disable-domain-reliability",
+          "--disable-component-update",
+          "--disable-component-extensions-with-background-pages",
+          "--disable-extensions-except",
+          "--disable-plugins-discovery",
+          "--disable-preconnect",
+          "--disable-print-preview",
+
+          // Performance and stability
           "--no-first-run",
           "--no-zygote",
           "--single-process",
           "--disable-gpu",
-          "--disable-features=NetworkService",
-          "--disable-extensions",
-          "--disable-background-timer-throttling",
-          "--disable-backgrounding-occluded-windows",
-          "--disable-renderer-backgrounding",
-          "--disable-features=TranslateUI",
-          "--disable-ipc-flooding-protection",
-          "--disable-web-security",
+          "--disable-accelerated-2d-canvas",
           "--disable-features=VizDisplayCompositor",
           "--disable-software-rasterizer",
-          "--disable-background-networking",
-          "--disable-default-apps",
-          "--disable-sync",
-          "--disable-translate",
           "--hide-scrollbars",
           "--metrics-recording-only",
           "--mute-audio",
@@ -2277,33 +2302,22 @@ export async function analyzeButtonClicks(
           "--no-pings",
           "--password-store=basic",
           "--use-mock-keychain",
-          "--disable-component-extensions-with-background-pages",
-          "--disable-extensions-except",
-          "--disable-plugins-discovery",
-          "--disable-preconnect",
-          "--disable-print-preview",
-          "--disable-component-update",
-          "--disable-domain-reliability",
-          "--disable-client-side-phishing-detection",
-          "--disable-hang-monitor",
-          "--disable-popup-blocking",
-          "--disable-prompt-on-repost",
-          "--disable-sync",
-          "--disable-web-resources",
-          "--disable-permissions-api",
-          "--disable-notifications",
-          "--disable-desktop-notifications",
-          "--disable-file-system",
-          "--disable-web-security",
           "--allow-running-insecure-content",
           "--disable-blink-features=AutomationControlled",
-          "--disable-dev-shm-usage",
           "--memory-pressure-off",
           "--max_old_space_size=4096",
+
+          // Aggressive timeout prevention
+          "--disable-features=NetworkServiceInProcess",
+          "--disable-features=NetworkServiceInProcess2",
+          "--disable-features=OutOfBlinkCors",
+          "--disable-features=BlockInsecurePrivateNetworkRequests",
+          "--disable-features=PrivateNetworkAccessSendPreflights",
+          "--disable-features=PrivateNetworkAccessRespectPreflightResults",
         ],
-        // Enhanced timeout settings for Docker
-        timeout: 60000,
-        protocolTimeout: 60000,
+        // Increased timeout settings for Docker
+        timeout: 120000, // 2 minutes
+        protocolTimeout: 120000, // 2 minutes
         // Do NOT set userDataDir to ensure a fresh profile is used
       };
 
@@ -2318,38 +2332,128 @@ export async function analyzeButtonClicks(
         executablePath: puppeteerConfig.executablePath || "default",
         argsCount: puppeteerConfig.args.length,
         headless: puppeteerConfig.headless,
+        timeout: puppeteerConfig.timeout,
+        protocolTimeout: puppeteerConfig.protocolTimeout,
       });
 
-      browser = await puppeteer.launch(puppeteerConfig);
-      console.log("✅ Chrome launched successfully");
+      // Try launching with different configurations if needed
+      let launchSuccess = false;
+      let launchError: any = null;
+
+      // First attempt: Full configuration
+      try {
+        browser = await puppeteer.launch(puppeteerConfig);
+        console.log("✅ Chrome launched successfully with full config");
+        launchSuccess = true;
+      } catch (error) {
+        console.warn("⚠️ Full config failed, trying minimal config...");
+        launchError = error;
+
+        // Second attempt: Ultra-minimal configuration
+        try {
+          const minimalConfig: any = {
+            headless: true,
+            defaultViewport: { width: 1366, height: 768 },
+            args: [
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-dev-shm-usage",
+              "--disable-gpu",
+              "--single-process",
+              "--disable-web-security",
+              "--disable-features=NetworkService",
+              "--disable-extensions",
+              "--disable-plugins",
+              "--no-first-run",
+            ],
+            timeout: 120000,
+            protocolTimeout: 120000,
+          };
+
+          if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+            minimalConfig.executablePath =
+              process.env.PUPPETEER_EXECUTABLE_PATH;
+          }
+
+          browser = await puppeteer.launch(minimalConfig);
+          console.log("✅ Chrome launched successfully with minimal config");
+          launchSuccess = true;
+        } catch (minimalError) {
+          console.error("❌ Both launch attempts failed");
+          throw minimalError;
+        }
+      }
+
+      if (!launchSuccess) {
+        throw launchError;
+      }
 
       console.log("📄 Creating new page...");
-      let page: Page;
+      let page: Page | null = null;
 
-      try {
-        console.log("🔄 Creating new page...");
-        page = await browser.newPage();
-        console.log("✅ Page created successfully");
+      // Implement robust page creation with multiple attempts
+      let pageCreated = false;
+      let pageAttempts = 0;
+      const maxPageAttempts = 3;
 
-        // Add debugging for page events
-        page.on("error", (err) => {
-          console.error("🚨 Page error:", err);
-        });
+      while (!pageCreated && pageAttempts < maxPageAttempts) {
+        pageAttempts++;
+        console.log(
+          `🔄 Creating new page (attempt ${pageAttempts}/${maxPageAttempts})...`
+        );
 
-        page.on("pageerror", (err) => {
-          console.error("🚨 Page error event:", err);
-        });
+        try {
+          page = await browser.newPage();
+          console.log("✅ Page created successfully");
+          pageCreated = true;
 
-        page.on("requestfailed", (req) => {
-          console.warn(
-            "⚠️ Request failed:",
-            req.url(),
-            req.failure()?.errorText
+          // Add debugging for page events
+          page.on("error", (err) => {
+            console.error("🚨 Page error:", err);
+          });
+
+          page.on("pageerror", (err) => {
+            console.error("🚨 Page error event:", err);
+          });
+
+          page.on("requestfailed", (req) => {
+            console.warn(
+              "⚠️ Request failed:",
+              req.url(),
+              req.failure()?.errorText
+            );
+          });
+        } catch (pageError: any) {
+          console.error(
+            `❌ Failed to create page (attempt ${pageAttempts}):`,
+            pageError.message
           );
-        });
-      } catch (pageError) {
-        console.error("❌ Failed to create page:", pageError);
-        throw new Error(`Failed to create page: ${pageError}`);
+
+          if (
+            pageError.message &&
+            pageError.message.includes("Network.enable")
+          ) {
+            console.log(
+              "🔄 Network.enable timeout detected, waiting before retry..."
+            );
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+
+            if (pageAttempts < maxPageAttempts) {
+              console.log("🔄 Retrying page creation...");
+              continue;
+            }
+          }
+
+          if (pageAttempts >= maxPageAttempts) {
+            throw new Error(
+              `Failed to create page after ${maxPageAttempts} attempts: ${pageError.message}`
+            );
+          }
+        }
+      }
+
+      if (!pageCreated || !page) {
+        throw new Error("Failed to create page after all attempts");
       }
 
       try {
