@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "cd backend && npm ci && npm run build",
+    "build:frontend": "vite build",
+    "build:backend": "cd backend && npm ci && npm run build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build:frontend",
+    "start": "cd backend && npm start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
