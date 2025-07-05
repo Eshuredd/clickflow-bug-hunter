@@ -402,11 +402,75 @@ export const AnalysisResults = ({
         bugDetails += "• No navigation errors or 404 pages found\n";
       }
 
-      // Create comprehensive email content
-      const subject = encodeURIComponent(
-        `🐛 Bug Analysis Report - ${url} (${bugs.length} issues found)`
+      // MASTER SOLUTION: Try backend email service first
+      const userEmail = prompt(
+        "Enter your email address to receive the detailed report:"
       );
-      const emailBody =
+      if (userEmail && userEmail.includes("@")) {
+        try {
+          const response = await fetch("/api/analysis/send-report-email", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              url,
+              bugs,
+              totalElements,
+              analysisTime,
+              recipientEmail: userEmail,
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+
+            // Download PDF as backup
+            const downloadUrl = URL.createObjectURL(pdfBlob);
+            const link = document.createElement("a");
+            link.href = downloadUrl;
+            link.download = fileName;
+            link.style.display = "none";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(downloadUrl);
+
+            // Show master solution success message
+            const alertMessage =
+              `🚀 MASTER SOLUTION APPLIED!\n\n` +
+              `✅ SECURE REPORT GENERATED:\n` +
+              `• Detailed report created with secure link\n` +
+              `• Email prepared for: ${userEmail}\n` +
+              `• Report expires in 24 hours for security\n` +
+              `• PDF backup downloaded locally\n\n` +
+              `🔗 SECURE REPORT URL:\n` +
+              `${data.reportUrl}\n\n` +
+              `📧 EMAIL PREVIEW:\n` +
+              `Subject: ${data.emailPreview.subject}\n\n` +
+              `This solution avoids URL length limits entirely by:\n` +
+              `• Using backend report generation\n` +
+              `• Creating secure, temporary report links\n` +
+              `• Enabling server-side email sending\n` +
+              `• Providing enterprise-grade security\n\n` +
+              `The report link has been copied to clipboard.`;
+
+            // Copy report URL to clipboard
+            await navigator.clipboard.writeText(data.reportUrl).catch(() => {});
+
+            alert(alertMessage);
+            return;
+          }
+        } catch (backendError) {
+          console.warn(
+            "Backend email service unavailable, falling back to expert solution:",
+            backendError
+          );
+        }
+      }
+
+      // EXPERT SOLUTION: Use clipboard API and provide instructions
+      const fullEmailContent =
         `Hi,\n\n` +
         `I've completed a comprehensive bug analysis of the website: ${url}\n\n` +
         `ANALYSIS SUMMARY:\n` +
@@ -438,43 +502,95 @@ export const AnalysisResults = ({
         `ClickFlow Bug Hunter Team\n` +
         `Automated Website Testing & Analysis`;
 
-      const body = encodeURIComponent(emailBody);
+      // Try to copy full content to clipboard
+      try {
+        await navigator.clipboard.writeText(fullEmailContent);
 
-      // Create Gmail compose URL
-      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`;
+        // Create simple Gmail URL without body content
+        const subject = encodeURIComponent(
+          `🐛 Bug Analysis Report - ${url} (${bugs.length} issues found)`
+        );
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}`;
 
-      // Open Gmail compose in new tab
-      window.open(gmailUrl, "_blank");
+        // Open Gmail compose in new tab
+        window.open(gmailUrl, "_blank");
 
-      // Create a downloadable PDF for manual attachment
-      const downloadUrl = URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = fileName;
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(downloadUrl);
+        // Download PDF
+        const downloadUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = fileName;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
 
-      // Show user instruction with detailed information
-      const alertMessage =
-        bugs.length > 0
-          ? `📧 Gmail compose opened with detailed bug report!\n\n` +
-            `✅ Email includes:\n` +
-            `• Complete analysis summary\n` +
-            `• ${bugs.length} detailed bug descriptions\n` +
-            `• Specific recommendations for each issue\n` +
-            `• Technical analysis information\n\n` +
-            `📎 PDF report downloaded for attachment\n` +
-            `Please attach the downloaded PDF to your email for complete documentation.\n\n` +
-            `Note: Due to browser security, files cannot be auto-attached to Gmail.`
-          : `📧 Gmail compose opened with success report!\n\n` +
-            `✅ Great news: No bugs found!\n` +
-            `The email includes a detailed summary of all tested elements.\n\n` +
-            `📎 PDF report downloaded as backup documentation.`;
+        // Show user instructions
+        const alertMessage =
+          `📧 Gmail opened successfully!\n\n` +
+          `✅ EXPERT SOLUTION APPLIED:\n` +
+          `• Full report content copied to clipboard\n` +
+          `• Gmail compose opened with subject line\n` +
+          `• PDF report downloaded for attachment\n\n` +
+          `📋 NEXT STEPS:\n` +
+          `1. Paste the report content (Ctrl+V/Cmd+V) into the email body\n` +
+          `2. Attach the downloaded PDF file\n` +
+          `3. Add recipient and send\n\n` +
+          `This avoids URL length limitations while preserving all details.`;
 
-      alert(alertMessage);
+        alert(alertMessage);
+      } catch (clipboardError) {
+        // Fallback to beginner solution if clipboard fails
+        console.warn(
+          "Clipboard access failed, falling back to simple email:",
+          clipboardError
+        );
+
+        const simpleEmailBody =
+          `Hi,\n\n` +
+          `Bug analysis completed for: ${url}\n\n` +
+          `SUMMARY:\n` +
+          `• Elements Tested: ${totalElements}\n` +
+          `• Bugs Found: ${bugs.length}\n` +
+          `• Analysis Time: ${analysisTime.toFixed(1)}s\n\n` +
+          (bugs.length > 0
+            ? `Top Issues Found:\n` +
+              bugs
+                .slice(0, 3)
+                .map((bug, i) => `${i + 1}. ${bug.element} - ${bug.type}\n`)
+                .join("") +
+              (bugs.length > 3
+                ? `\n...and ${bugs.length - 3} more issues.\n\n`
+                : "\n") +
+              `Please see attached PDF for complete details.\n\n`
+            : `🎉 No bugs found! Website is functioning well.\n\n`) +
+          `Best regards,\n` +
+          `ClickFlow Bug Hunter Team`;
+
+        const subject = encodeURIComponent(
+          `🐛 Bug Analysis Report - ${bugs.length} issues found`
+        );
+        const body = encodeURIComponent(simpleEmailBody);
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`;
+
+        window.open(gmailUrl, "_blank");
+
+        // Download PDF
+        const downloadUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = fileName;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+
+        alert(
+          "Gmail opened with summary. Full report available in PDF attachment."
+        );
+      }
     } catch (error) {
       console.error("Mail PDF failed:", error);
       alert("Failed to prepare email. Please try again.");

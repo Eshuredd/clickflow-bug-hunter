@@ -25,8 +25,8 @@ export class WebsiteAnalyzer {
     try {
       // Call the actual backend API
       const response = await fetch(
-        "http://localhost:4000/api/analysis/button-clicks",
-        // "https://www.getaigis.com/api/analysis/button-clicks",
+        "https://sea-lion-app-46la7.ondigitalocean.app/api/analysis/button-clicks",
+        // "http://localhost:4000/api/analysis/button-clicks",
         {
           method: "POST",
           headers: {

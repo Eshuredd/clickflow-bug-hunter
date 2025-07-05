@@ -1,33 +1,39 @@
-# Use Node.js 18 as base image
+# Use Node.js 18 Alpine for smaller image size
 FROM node:18-alpine
+
+# Install system dependencies required for Puppeteer and Chrome
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    freetype-dev \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    && rm -rf /var/cache/apk/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy backend package files first (for better caching)
+# Copy package files
 COPY backend/package*.json ./
 
-# Install ALL dependencies (including devDependencies for TypeScript)
-RUN npm ci
+# Install dependencies
+RUN npm ci --only=production
 
 # Copy backend source code
-COPY backend/ ./
+COPY backend/src ./src
+COPY backend/tsconfig.json ./
 
-# Build the TypeScript code
+# Build TypeScript
 RUN npm run build
 
-# Verify the build worked
-RUN ls -la dist/
-
-# Remove devDependencies after build
-RUN npm ci --only=production
+# Set environment variables for Puppeteer
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Expose port
 EXPOSE 4000
-
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=4000
 
 # Start the application
 CMD ["npm", "start"] 

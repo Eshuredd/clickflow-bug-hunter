@@ -8,7 +8,10 @@ const app = express();
 // ✅ enable CORS before your routes
 app.use(
   cors({
-    origin: "http://localhost:8080", // allow frontend origin
+    origin: [
+      "http://localhost:8080", // local development
+      "https://www.getaigis.com", // production frontend domain
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true, // set to true if you use cookies/auth
   })
