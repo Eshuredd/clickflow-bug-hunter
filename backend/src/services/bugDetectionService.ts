@@ -2199,17 +2199,46 @@ export async function analyzeButtonClicks(
 
   while (attempt < maxRetries) {
     try {
-      browser = await puppeteer.launch({
+      // Docker-compatible Puppeteer configuration
+      const puppeteerConfig: any = {
         headless: true,
         defaultViewport: { width: 1366, height: 768 },
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--no-first-run",
+          "--no-zygote",
+          "--single-process",
+          "--disable-gpu",
           "--disable-features=NetworkService",
-          "--disable-extensions", // Disable all browser extensions for a clean profile
+          "--disable-extensions",
+          "--disable-background-timer-throttling",
+          "--disable-backgrounding-occluded-windows",
+          "--disable-renderer-backgrounding",
+          "--disable-features=TranslateUI",
+          "--disable-ipc-flooding-protection",
         ],
         // Do NOT set userDataDir to ensure a fresh profile is used
+      };
+
+      // Use Docker Chrome executable if available
+      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      } else if (process.env.CHROME_BIN) {
+        puppeteerConfig.executablePath = process.env.CHROME_BIN;
+      }
+
+      console.log('🚀 Launching Chrome with config:', {
+        executablePath: puppeteerConfig.executablePath || 'default',
+        argsCount: puppeteerConfig.args.length,
+        headless: puppeteerConfig.headless
       });
+      
+      browser = await puppeteer.launch(puppeteerConfig);
+      console.log('✅ Chrome launched successfully');
+      
       const page = await browser.newPage();
       await page.setUserAgent(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"

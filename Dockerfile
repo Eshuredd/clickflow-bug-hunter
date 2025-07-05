@@ -10,7 +10,13 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
+    udev \
+    ttf-liberation \
     && rm -rf /var/cache/apk/*
+
+# Create a non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001
 
 # Set working directory
 WORKDIR /app
@@ -34,6 +40,12 @@ RUN npm ci --only=production && npm cache clean --force
 # Set environment variables for Puppeteer
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV CHROME_BIN=/usr/bin/chromium-browser
+ENV PUPPETEER_ARGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-accelerated-2d-canvas --no-first-run --no-zygote --single-process --disable-gpu"
+
+# Change ownership of the app directory to nodejs user
+RUN chown -R nextjs:nodejs /app
+USER nextjs
 
 # Expose port
 EXPOSE 4000
