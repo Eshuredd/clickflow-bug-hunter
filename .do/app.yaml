@@ -1,0 +1,32 @@
+name: clickflow-bug-hunter
+services:
+  - name: backend
+    source_dir: /backend
+    github:
+      repo: your-username/clickflow-bug-hunter
+      branch: main
+    run_command: npm start
+    build_command: npm ci && npm run build
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 4000
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+  - name: frontend
+    source_dir: /
+    github:
+      repo: your-username/clickflow-bug-hunter
+      branch: main
+    build_command: npm ci && npm run build:frontend
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    routes:
+      - path: /
+    static_sites:
+      - name: frontend
+        source_dir: /dist

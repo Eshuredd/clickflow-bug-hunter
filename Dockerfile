@@ -4,17 +4,23 @@ FROM node:18-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy backend package files
+# Copy backend package files first (for better caching)
 COPY backend/package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including devDependencies for TypeScript)
+RUN npm ci
 
 # Copy backend source code
 COPY backend/ ./
 
 # Build the TypeScript code
 RUN npm run build
+
+# Verify the build worked
+RUN ls -la dist/
+
+# Remove devDependencies after build
+RUN npm ci --only=production
 
 # Expose port
 EXPOSE 4000
