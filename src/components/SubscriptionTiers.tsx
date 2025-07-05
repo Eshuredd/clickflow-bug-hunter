@@ -5,14 +5,25 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Zap, Users, Crown } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 export const SubscriptionTiers = () => {
-  const { userSubscription } = useAuth();
+  const { user, userSubscription } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const currentTier = userSubscription?.subscription_tier || 'Free';
 
   const handleUpgrade = (planName: string) => {
+    if (!user) {
+      toast({
+        title: "Sign In Required",
+        description: "Please sign in to upgrade your plan.",
+      });
+      navigate('/auth');
+      return;
+    }
+    
     toast({
       title: "Upgrade Feature",
       description: `Upgrade to ${planName} will be available soon. Contact support for early access.`,
@@ -36,7 +47,8 @@ export const SubscriptionTiers = () => {
       color: 'text-green-400',
       buttonText: currentTier === 'Free' ? 'Current Plan' : 'Downgrade',
       buttonVariant: 'outline' as const,
-      isCurrent: currentTier === 'Free'
+      isCurrent: currentTier === 'Free',
+      requiresAuth: false
     },
     {
       name: 'Professional',
@@ -54,10 +66,11 @@ export const SubscriptionTiers = () => {
       ],
       icon: Zap,
       color: 'text-blue-400',
-      buttonText: currentTier === 'Professional' ? 'Current Plan' : 'Upgrade Now',
+      buttonText: currentTier === 'Professional' ? 'Current Plan' : user ? 'Upgrade Now' : 'Sign In to Upgrade',
       buttonVariant: currentTier === 'Professional' ? 'outline' as 'outline' : 'default' as 'default',
       popular: true,
-      isCurrent: currentTier === 'Professional'
+      isCurrent: currentTier === 'Professional',
+      requiresAuth: true
     },
     {
       name: 'Enterprise',
@@ -77,9 +90,10 @@ export const SubscriptionTiers = () => {
       ],
       icon: Crown,
       color: 'text-purple-400',
-      buttonText: currentTier === 'Enterprise' ? 'Current Plan' : 'Contact Sales',
+      buttonText: currentTier === 'Enterprise' ? 'Current Plan' : user ? 'Contact Sales' : 'Sign In to Contact Sales',
       buttonVariant: 'outline' as const,
-      isCurrent: currentTier === 'Enterprise'
+      isCurrent: currentTier === 'Enterprise',
+      requiresAuth: true
     }
   ];
 
@@ -89,14 +103,14 @@ export const SubscriptionTiers = () => {
         <h2 className="text-3xl font-bold text-white mb-4">Choose Your Plan</h2>
         <p className="text-slate-400 max-w-2xl mx-auto">
           Scale your bug detection capabilities with plans designed for individuals, 
-          teams, and enterprises. You're currently on the <strong>{currentTier}</strong> plan.
+          teams, and enterprises. {user ? `You're currently on the ${currentTier} plan.` : 'Sign in to track your subscription.'}
         </p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
         {plans.map((plan, index) => (
           <Card key={index} className={`bg-slate-800/50 border-slate-700 relative ${
-            plan.popular ? 'ring-2 ring-blue-500/50' : ''
+            plan.popular && !plan.isCurrent ? 'ring-2 ring-blue-500/50' : ''
           } ${plan.isCurrent ? 'ring-2 ring-green-500/50' : ''}`}>
             {plan.popular && !plan.isCurrent && (
               <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white">
@@ -162,8 +176,11 @@ export const SubscriptionTiers = () => {
             <Button variant="outline" className="border-slate-600 text-slate-300">
               Schedule Demo
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              Contact Enterprise Sales
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => !user && navigate('/auth')}
+            >
+              {user ? 'Contact Enterprise Sales' : 'Sign In to Contact Sales'}
             </Button>
           </div>
         </CardContent>
