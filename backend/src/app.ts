@@ -10,10 +10,14 @@ app.use(
   cors({
     origin: [
       "http://localhost:8080", // local development
+      "http://localhost:3000", // React dev server
+      "http://localhost:5173", // Vite dev server
       "https://www.getaigis.com", // production frontend domain
+      "https://sea-lion-app-46la7.ondigitalocean.app", // backend domain (for testing)
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true, // set to true if you use cookies/auth
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   })
 );
 

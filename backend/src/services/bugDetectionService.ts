@@ -2362,12 +2362,26 @@ export async function analyzeButtonClicks(
               "--single-process",
               "--disable-web-security",
               "--disable-features=NetworkService",
+              "--disable-features=NetworkServiceLogging",
+              "--disable-network-service-logging",
               "--disable-extensions",
               "--disable-plugins",
               "--no-first-run",
+              "--disable-logging",
+              "--disable-background-networking",
+              "--disable-default-apps",
+              "--disable-sync",
+              "--disable-translate",
+              "--disable-ipc-flooding-protection",
+              "--disable-hang-monitor",
+              "--disable-client-side-phishing-detection",
+              "--disable-component-update",
+              "--disable-domain-reliability",
+              "--disable-features=VizDisplayCompositor",
+              "--remote-debugging-port=0", // Disable remote debugging
             ],
-            timeout: 120000,
-            protocolTimeout: 120000,
+            timeout: 180000, // 3 minutes
+            protocolTimeout: 180000, // 3 minutes
           };
 
           if (process.env.PUPPETEER_EXECUTABLE_PATH) {
@@ -2379,8 +2393,54 @@ export async function analyzeButtonClicks(
           console.log("✅ Chrome launched successfully with minimal config");
           launchSuccess = true;
         } catch (minimalError) {
-          console.error("❌ Both launch attempts failed");
-          throw minimalError;
+          console.warn("⚠️ Minimal config failed, trying emergency config...");
+
+          // Third attempt: Emergency configuration with no network features
+          try {
+            const emergencyConfig: any = {
+              headless: true,
+              args: [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--single-process",
+                "--disable-web-security",
+                "--disable-features=NetworkService,NetworkServiceLogging,VizDisplayCompositor",
+                "--disable-extensions",
+                "--disable-plugins",
+                "--disable-background-networking",
+                "--disable-logging",
+                "--no-first-run",
+                "--disable-default-apps",
+                "--disable-sync",
+                "--disable-translate",
+                "--disable-component-update",
+                "--disable-domain-reliability",
+                "--disable-hang-monitor",
+                "--disable-client-side-phishing-detection",
+                "--disable-ipc-flooding-protection",
+                "--remote-debugging-port=0",
+                "--disable-features=Translate,BackForwardCache,AcceptCHFrame,MediaRouter,OptimizationHints",
+              ],
+              timeout: 240000, // 4 minutes
+              protocolTimeout: 240000, // 4 minutes
+            };
+
+            if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+              emergencyConfig.executablePath =
+                process.env.PUPPETEER_EXECUTABLE_PATH;
+            }
+
+            browser = await puppeteer.launch(emergencyConfig);
+            console.log(
+              "✅ Chrome launched successfully with emergency config"
+            );
+            launchSuccess = true;
+          } catch (emergencyError) {
+            console.error("❌ All launch attempts failed");
+            throw emergencyError;
+          }
         }
       }
 
@@ -2436,7 +2496,7 @@ export async function analyzeButtonClicks(
             console.log(
               "🔄 Network.enable timeout detected, waiting before retry..."
             );
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 5000)); // Increased wait time
 
             if (pageAttempts < maxPageAttempts) {
               console.log("🔄 Retrying page creation...");
@@ -2445,9 +2505,43 @@ export async function analyzeButtonClicks(
           }
 
           if (pageAttempts >= maxPageAttempts) {
-            throw new Error(
-              `Failed to create page after ${maxPageAttempts} attempts: ${pageError.message}`
+            console.error(
+              `❌ Failed to create page after ${maxPageAttempts} attempts`
             );
+
+            // If page creation keeps failing, try a different approach
+            if (
+              pageError.message &&
+              pageError.message.includes("Network.enable")
+            ) {
+              console.log(
+                "🔄 Attempting page creation with network features disabled..."
+              );
+
+              try {
+                // Try to create page with minimal network features
+                const pages = await browser.pages();
+                if (pages.length > 0) {
+                  page = pages[0]; // Use existing page if available
+                  console.log(
+                    "✅ Using existing page instead of creating new one"
+                  );
+                  pageCreated = true;
+                  break;
+                }
+              } catch (existingPageError) {
+                console.warn(
+                  "⚠️ Could not use existing page:",
+                  existingPageError
+                );
+              }
+            }
+
+            if (!pageCreated) {
+              throw new Error(
+                `Failed to create page after ${maxPageAttempts} attempts: ${pageError.message}`
+              );
+            }
           }
         }
       }

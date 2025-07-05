@@ -105,24 +105,64 @@ router.get("/health", async (req: any, res: any) => {
   try {
     const puppeteer = require("puppeteer");
 
-    // Quick browser test
+    // Test with the same configuration as the main analysis
     const browser = await puppeteer.launch({
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      timeout: 10000,
-      protocolTimeout: 10000,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+        "--disable-web-security",
+        "--disable-features=NetworkService",
+        "--disable-extensions",
+        "--disable-plugins",
+        "--no-first-run",
+      ],
+      timeout: 30000,
+      protocolTimeout: 30000,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
     });
 
-    const page = await browser.newPage();
-    await page.goto("data:text/html,<h1>Health Check</h1>", { timeout: 5000 });
+    console.log("✅ Browser launched for health check");
+
+    let pageCreated = false;
+    let pageError = null;
+
+    try {
+      const page = await browser.newPage();
+      console.log("✅ Page created for health check");
+      await page.goto("data:text/html,<h1>Health Check</h1>", {
+        timeout: 5000,
+      });
+      pageCreated = true;
+      await page.close();
+    } catch (error) {
+      pageError = error;
+      console.error("❌ Page creation failed in health check:", error);
+    }
+
     await browser.close();
 
-    res.json({
-      service: "analysis",
-      browser: "healthy",
-      chrome: process.env.PUPPETEER_EXECUTABLE_PATH || "default",
-      timestamp: new Date().toISOString(),
-    });
+    if (pageCreated) {
+      res.json({
+        service: "analysis",
+        browser: "healthy",
+        chrome: process.env.PUPPETEER_EXECUTABLE_PATH || "default",
+        pageCreation: "success",
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      res.status(500).json({
+        service: "analysis",
+        browser: "unhealthy",
+        chrome: process.env.PUPPETEER_EXECUTABLE_PATH || "default",
+        pageCreation: "failed",
+        error: (pageError as Error)?.message || "Unknown error",
+        timestamp: new Date().toISOString(),
+      });
+    }
   } catch (error) {
     console.error("Browser health check failed:", error);
     res.status(500).json({
@@ -173,7 +213,7 @@ router.post("/button-clicks", async (req: any, res: any) => {
   if (!url) return res.status(400).json({ error: "URL is required" });
 
   // Set response timeout to prevent gateway timeouts
-  const timeoutMs = 150000; // 2.5 minutes (allow time for Puppeteer operations with retries)
+  const timeoutMs = 300000; // 5 minutes (allow time for multiple Puppeteer retry attempts)
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(
       () =>
@@ -228,6 +268,29 @@ router.post("/button-clicks", async (req: any, res: any) => {
       res.status(500).json({ error: error.message });
     }
   }
+});
+
+// Simple test endpoint that returns mock data immediately
+router.get("/test", (req: any, res: any) => {
+  res.json({
+    message: "Test endpoint working",
+    timestamp: new Date().toISOString(),
+    mockResults: [
+      {
+        selector: "test-button",
+        textContent: "Test Button",
+        bugType: "TestBug",
+        description: "This is a test bug for debugging",
+        elementType: "button",
+        isVisible: true,
+        urlBefore: "https://example.com",
+        urlAfter: "https://example.com",
+        navigated: false,
+        contentChanged: false,
+        wasClicked: false,
+      },
+    ],
+  });
 });
 
 export default router;
