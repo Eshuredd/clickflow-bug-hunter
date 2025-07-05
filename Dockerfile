@@ -18,8 +18,8 @@ WORKDIR /app
 # Copy package files
 COPY backend/package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including dev dependencies for TypeScript build)
+RUN npm ci
 
 # Copy backend source code
 COPY backend/src ./src
@@ -27,6 +27,9 @@ COPY backend/tsconfig.json ./
 
 # Build TypeScript
 RUN npm run build
+
+# Remove dev dependencies after build to reduce image size
+RUN npm ci --only=production && npm cache clean --force
 
 # Set environment variables for Puppeteer
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true

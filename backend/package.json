@@ -7,7 +7,7 @@
     "dev": "ts-node-dev src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "postbuild": "echo 'Build completed. Contents of dist:' && ls -la dist/"
+    "postbuild": "echo Build completed successfully"
   },
   "keywords": [],
   "author": "",
