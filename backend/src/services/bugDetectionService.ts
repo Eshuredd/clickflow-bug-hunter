@@ -55,6 +55,7 @@ export async function analyzeButtonClicks(
   let attempt = 0;
   let lastError: any = null;
   const analysisStart = Date.now();
+  const maxAnalysisTime = 5 * 60 * 1000; // 5 minutes max
   let browser: Browser | null = null;
   let analysisCompleted = false;
   let cachedSidebarState: SidebarState | null = null; // Cache for performance
@@ -2197,9 +2198,52 @@ export async function analyzeButtonClicks(
     }
   }
 
+  /**
+   * Check if page is still valid and can be used
+   */
+  async function isPageHealthy(page: Page): Promise<boolean> {
+    try {
+      if (page.isClosed()) {
+        return false;
+      }
+      // Try a simple evaluation to check if page is responsive
+      await page.evaluate(() => document.readyState);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Safely perform page operations with health checks
+   */
+  async function safePageOperation<T>(
+    page: Page,
+    operation: () => Promise<T>,
+    operationName: string
+  ): Promise<T> {
+    if (!(await isPageHealthy(page))) {
+      throw new Error(`Page is not healthy before ${operationName}`);
+    }
+
+    try {
+      const result = await operation();
+
+      // Check if page is still healthy after operation
+      if (!(await isPageHealthy(page))) {
+        console.warn(`⚠️ Page became unhealthy after ${operationName}`);
+      }
+
+      return result;
+    } catch (error) {
+      console.error(`❌ Error during ${operationName}:`, error);
+      throw error;
+    }
+  }
+
   while (attempt < maxRetries) {
     try {
-      // Docker-compatible Puppeteer configuration
+      // Docker-compatible Puppeteer configuration with enhanced stability
       const puppeteerConfig: any = {
         headless: true,
         defaultViewport: { width: 1366, height: 768 },
@@ -2219,7 +2263,30 @@ export async function analyzeButtonClicks(
           "--disable-renderer-backgrounding",
           "--disable-features=TranslateUI",
           "--disable-ipc-flooding-protection",
+          "--disable-web-security",
+          "--disable-features=VizDisplayCompositor",
+          "--disable-software-rasterizer",
+          "--disable-background-networking",
+          "--disable-default-apps",
+          "--disable-sync",
+          "--disable-translate",
+          "--hide-scrollbars",
+          "--metrics-recording-only",
+          "--mute-audio",
+          "--no-default-browser-check",
+          "--no-pings",
+          "--password-store=basic",
+          "--use-mock-keychain",
+          "--disable-component-extensions-with-background-pages",
+          "--disable-extensions-except",
+          "--disable-plugins-discovery",
+          "--disable-preconnect",
+          "--disable-print-preview",
+          "--disable-component-update",
         ],
+        // Enhanced timeout settings for Docker
+        timeout: 30000,
+        protocolTimeout: 30000,
         // Do NOT set userDataDir to ensure a fresh profile is used
       };
 
@@ -2245,12 +2312,29 @@ export async function analyzeButtonClicks(
       // Wait for page to be fully initialized
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      await page.setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-      );
+      // Check if page is still valid before setting properties
+      if (page.isClosed()) {
+        throw new Error("Page was closed unexpectedly during initialization");
+      }
 
-      // Set viewport and other page settings
-      await page.setViewport({ width: 1366, height: 768 });
+      // Set user agent with safe operation
+      await safePageOperation(
+        page,
+        () =>
+          page.setUserAgent(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+          ),
+        "setting user agent"
+      );
+      console.log("✅ User agent set successfully");
+
+      // Set viewport with safe operation
+      await safePageOperation(
+        page,
+        () => page.setViewport({ width: 1366, height: 768 }),
+        "setting viewport"
+      );
+      console.log("✅ Viewport set successfully");
 
       const results: ButtonClickResult[] = [];
       const visited = new Set<string>();
@@ -2258,36 +2342,60 @@ export async function analyzeButtonClicks(
 
       console.log(`🌐 Navigating to: ${url}`);
 
-      // Enhanced page navigation with better error handling
-      try {
-        await page.goto(url, {
-          waitUntil: "domcontentloaded",
-          timeout: 20000,
-        });
-        console.log("✅ Page loaded successfully");
-      } catch (gotoError) {
-        const error = gotoError as Error;
-        console.error("❌ Navigation failed:", error.message);
-        throw new Error(`Failed to navigate to ${url}: ${error.message}`);
-      }
+      // Enhanced page navigation with safe operation
+      await safePageOperation(
+        page,
+        () =>
+          page.goto(url, {
+            waitUntil: "domcontentloaded",
+            timeout: 20000,
+          }),
+        "navigation"
+      );
+      console.log("✅ Page loaded successfully");
       await new Promise((res) => setTimeout(res, 1000));
 
       // Initialize consistent UI state for testing
-      await ensureConsistentSidebarState(page);
-      // Only run auth handler if the final URL is an auth page
-      if (await isAuthPage(page)) {
-        await handleAuthPage(page, results, url, visited, checkedElements);
+      if (await isPageHealthy(page)) {
+        await ensureConsistentSidebarState(page);
+
+        // Set up timeout for analysis
+        const analysisTimeout = setTimeout(() => {
+          console.warn("⏰ Analysis timeout reached, stopping...");
+          if (browser && browser.isConnected()) {
+            browser.close().catch(console.error);
+          }
+        }, maxAnalysisTime);
+
+        try {
+          // Only run auth handler if the final URL is an auth page
+          if (await isAuthPage(page)) {
+            await handleAuthPage(page, results, url, visited, checkedElements);
+          } else {
+            await analyzePage(page, url, visited, results, checkedElements);
+          }
+        } finally {
+          clearTimeout(analysisTimeout);
+        }
       } else {
-        await analyzePage(page, url, visited, results, checkedElements);
+        throw new Error("Page became unhealthy before analysis");
       }
       const analysisEnd = Date.now();
       if (!analysisCompleted) {
         analysisCompleted = true;
       }
       try {
-        await browser.close();
+        if (browser && !browser.isConnected()) {
+          console.log("🔌 Browser already disconnected, skipping close");
+        } else {
+          console.log("🔒 Closing browser...");
+          await browser.close();
+          console.log("✅ Browser closed successfully");
+        }
       } catch (closeErr: any) {
+        console.error("❌ Error closing browser:", closeErr.message);
         if (closeErr.code === "EPERM" || closeErr.code === "EACCES") {
+          console.log("⚠️ Permission error during browser close, ignoring");
         } else {
           throw closeErr;
         }
@@ -2296,23 +2404,46 @@ export async function analyzeButtonClicks(
     } catch (error: any) {
       lastError = error;
       attempt++;
+
+      console.error(`❌ Attempt ${attempt} failed:`, error.message);
+
+      // Handle specific error types
+      if (error.message && error.message.includes("TargetCloseError")) {
+        console.error(
+          "🎯 Target close error detected - page was closed unexpectedly"
+        );
+      } else if (error.message && error.message.includes("Protocol error")) {
+        console.error("🔌 Protocol error detected - connection issue");
+      } else if (error.message && error.message.includes("Session closed")) {
+        console.error("📱 Session closed error - browser session terminated");
+      }
+
       if (
         error.code === "EPERM" ||
         error.code === "EACCES" ||
         (error.message && error.message.includes("operation not permitted"))
       ) {
+        console.log(`⏱️ Retrying in 1 second due to permission error...`);
         await new Promise((res) => setTimeout(res, 1000));
         continue;
       } else {
+        console.error(`🛑 Non-recoverable error, stopping retries`);
         break;
       }
     } finally {
       if (browser) {
         try {
-          await browser.close();
+          if (browser.isConnected()) {
+            console.log("🧹 Cleaning up browser in finally block...");
+            await browser.close();
+            console.log("✅ Browser cleanup completed");
+          }
         } catch (closeErr: any) {
+          console.error("❌ Error during browser cleanup:", closeErr.message);
           if (closeErr.code === "EPERM" || closeErr.code === "EACCES") {
+            console.log("⚠️ Permission error during cleanup, ignoring");
           } else {
+            console.error("🚨 Unexpected error during cleanup:", closeErr);
           }
         }
       }
