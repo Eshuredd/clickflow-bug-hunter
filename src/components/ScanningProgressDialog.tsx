@@ -68,6 +68,7 @@ export const ScanningProgressDialog = ({
     function connect() {
       if (stopped) return;
       eventSource = new EventSource(
+        // `https://www.getaigis.com/api/analysis/button-clicks/stream?url=${encodeURIComponent(
         `http://localhost:4000/api/analysis/button-clicks/stream?url=${encodeURIComponent(
           url
         )}`

@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import analysisRoutes from "./routes/analysis";
+import { setupSwagger } from "./config/swagger";
 
 const app = express();
 
@@ -14,6 +15,68 @@ app.use(
 );
 
 app.use(express.json());
+
+// ✅ Setup Swagger documentation
+setupSwagger(app);
+
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Check if the server is running
+ *     tags:
+ *       - Health
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthCheck'
+ */
+app.get("/health", (req, res) => {
+  res.json({
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: Root endpoint
+ *     description: Welcome message and API information
+ *     tags:
+ *       - General
+ *     responses:
+ *       200:
+ *         description: Welcome message
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "ClickFlow Bug Hunter API is running!"
+ *                 version:
+ *                   type: string
+ *                   example: "1.0.0"
+ *                 docs:
+ *                   type: string
+ *                   example: "/api-docs"
+ */
+app.get("/", (req, res) => {
+  res.json({
+    message: "ClickFlow Bug Hunter API is running!",
+    version: "1.0.0",
+    docs: "/api-docs",
+    health: "/health",
+  });
+});
 
 // ✅ your routes
 app.use("/api/analysis", analysisRoutes);

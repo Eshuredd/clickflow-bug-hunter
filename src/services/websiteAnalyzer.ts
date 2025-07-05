@@ -26,6 +26,7 @@ export class WebsiteAnalyzer {
       // Call the actual backend API
       const response = await fetch(
         "http://localhost:4000/api/analysis/button-clicks",
+        // "https://www.getaigis.com/api/analysis/button-clicks",
         {
           method: "POST",
           headers: {

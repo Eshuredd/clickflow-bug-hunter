@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -15,6 +16,7 @@ import {
   FileText,
   Download,
   ArrowLeft,
+  Mail,
 } from "lucide-react";
 import { AnalysisResult } from "@/services/websiteAnalyzer";
 import jsPDF from "jspdf";
@@ -208,6 +210,277 @@ export const AnalysisResults = ({
     }
   };
 
+  const generatePDFBlob = () => {
+    try {
+      const doc = new jsPDF();
+
+      // Header
+      doc.setFontSize(20);
+      doc.text("Bug Analysis Report", 14, 20);
+
+      doc.setFontSize(11);
+      doc.text(`URL: ${url}`, 14, 35);
+      doc.text(`Total Elements: ${totalElements}`, 14, 45);
+      doc.text(`Bugs Found: ${bugs.length}`, 14, 55);
+      doc.text(`AI Verified: ${aiVerifiedCount}`, 14, 65);
+      doc.text(`Analysis Time: ${analysisTime.toFixed(1)}s`, 14, 75);
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 85);
+
+      if (bugs.length > 0) {
+        // Prepare table data with better formatting
+        const tableData = bugs.map((bug, idx) => [
+          idx + 1,
+          bug.page || "N/A",
+          bug.element || "N/A",
+          bug.severity || "N/A",
+          bug.type || "N/A",
+          // Truncate long descriptions
+          bug.description
+            ? bug.description.length > 50
+              ? bug.description.substring(0, 50) + "..."
+              : bug.description
+            : "N/A",
+          bug.aiVerified ? "Yes" : "No",
+        ]);
+
+        // Use the functional approach instead of method chaining
+        autoTable(doc, {
+          head: [
+            [
+              "#",
+              "Page",
+              "Element",
+              "Severity",
+              "Type",
+              "Description",
+              "AI Verified",
+            ],
+          ],
+          body: tableData,
+          startY: 95,
+          styles: {
+            fontSize: 8,
+            cellPadding: 2,
+            overflow: "linebreak",
+            cellWidth: "wrap",
+          },
+          headStyles: {
+            fillColor: [44, 62, 80],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+          },
+          columnStyles: {
+            0: { cellWidth: 10 }, // #
+            1: { cellWidth: 25 }, // Page
+            2: { cellWidth: 30 }, // Element
+            3: { cellWidth: 20 }, // Severity
+            4: { cellWidth: 25 }, // Type
+            5: { cellWidth: 60 }, // Description
+            6: { cellWidth: 20 }, // AI Verified
+          },
+          theme: "striped",
+          alternateRowStyles: {
+            fillColor: [245, 245, 245],
+          },
+        });
+
+        // Add detailed descriptions on a new page if there are many bugs
+        if (bugs.length > 10) {
+          doc.addPage();
+          doc.setFontSize(16);
+          doc.text("Detailed Bug Descriptions", 14, 20);
+
+          let yPosition = 35;
+          bugs.forEach((bug, idx) => {
+            if (yPosition > 250) {
+              doc.addPage();
+              yPosition = 20;
+            }
+
+            doc.setFontSize(12);
+            doc.text(
+              `${idx + 1}. ${bug.element} (${bug.severity})`,
+              14,
+              yPosition
+            );
+            yPosition += 10;
+
+            doc.setFontSize(10);
+            const descLines = doc.splitTextToSize(bug.description, 180);
+            doc.text(descLines, 14, yPosition);
+            yPosition += descLines.length * 5 + 5;
+
+            if (bug.context) {
+              const contextLines = doc.splitTextToSize(
+                `Context: ${bug.context}`,
+                180
+              );
+              doc.text(contextLines, 14, yPosition);
+              yPosition += contextLines.length * 5 + 10;
+            }
+          });
+        }
+      } else {
+        doc.setFontSize(14);
+        doc.text(
+          "🎉 No bugs found! Your website is functioning perfectly.",
+          14,
+          95
+        );
+
+        doc.setFontSize(11);
+        doc.text("All clickable elements are working correctly:", 14, 110);
+        doc.text("• All buttons and links respond properly", 20, 125);
+        doc.text("• No context mismatches detected", 20, 135);
+        doc.text("• Interactive elements function as expected", 20, 145);
+      }
+
+      return doc.output("blob");
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      throw error;
+    }
+  };
+
+  const handleMailPDF = async () => {
+    try {
+      // Generate PDF blob for attachment
+      const pdfBlob = generatePDFBlob();
+      const fileName = `bug-analysis-report-${
+        new Date().toISOString().split("T")[0]
+      }.pdf`;
+
+      // Create detailed bug information for email body
+      let bugDetails = "";
+      if (bugs.length > 0) {
+        bugDetails = "\n\nDETAILED BUG REPORT:\n" + "=".repeat(50) + "\n\n";
+
+        bugs.forEach((bug, index) => {
+          bugDetails += `${index + 1}. BUG FOUND\n`;
+          bugDetails += `   Element: ${bug.element || "Unknown element"}\n`;
+          bugDetails += `   Page: ${bug.page || url}\n`;
+          bugDetails += `   Severity: ${bug.severity || "Unknown"}\n`;
+          bugDetails += `   Bug Type: ${bug.type || "Unknown"}\n`;
+          bugDetails += `   Description: ${
+            bug.description || "No description available"
+          }\n`;
+          bugDetails += `   AI Verified: ${bug.aiVerified ? "Yes" : "No"}\n`;
+
+          if (bug.context) {
+            bugDetails += `   Technical Context: ${bug.context}\n`;
+          }
+
+          bugDetails += "\n" + "-".repeat(40) + "\n\n";
+        });
+
+        // Add recommendations
+        bugDetails += "RECOMMENDATIONS:\n" + "=".repeat(20) + "\n";
+        bugs.forEach((bug, index) => {
+          if (bug.type === "NoNavigation") {
+            bugDetails += `• Fix button "${bug.element}": Ensure it navigates to the intended page or triggers the expected UI change.\n`;
+          } else if (bug.type === "404Error") {
+            bugDetails += `• Fix broken link "${bug.element}": Update the link destination to a valid page.\n`;
+          } else if (bug.type === "ClickError") {
+            bugDetails += `• Fix unclickable element "${bug.element}": Ensure the element is properly interactive and not blocked by other elements.\n`;
+          } else if (bug.type === "NoSearchEffect") {
+            bugDetails += `• Fix search functionality "${bug.element}": Ensure search inputs trigger proper results or navigation.\n`;
+          } else if (bug.type === "NoDropdownEffect") {
+            bugDetails += `• Fix dropdown "${bug.element}": Ensure dropdown selections trigger UI updates or filtering.\n`;
+          } else if (bug.type === "NoCheckboxEffect") {
+            bugDetails += `• Fix checkbox functionality "${bug.element}": Ensure checkbox selections trigger filtering or UI changes.\n`;
+          } else {
+            bugDetails += `• Fix issue with "${bug.element}": ${bug.description}\n`;
+          }
+        });
+      } else {
+        bugDetails =
+          "\n\n🎉 EXCELLENT NEWS! No bugs were found during the analysis.\n\n";
+        bugDetails += "All tested elements are functioning correctly:\n";
+        bugDetails += "• All buttons and links respond properly\n";
+        bugDetails += "• Search functionality works as expected\n";
+        bugDetails += "• Dropdown and checkbox interactions are functional\n";
+        bugDetails += "• No navigation errors or 404 pages found\n";
+      }
+
+      // Create comprehensive email content
+      const subject = encodeURIComponent(
+        `🐛 Bug Analysis Report - ${url} (${bugs.length} issues found)`
+      );
+      const emailBody =
+        `Hi,\n\n` +
+        `I've completed a comprehensive bug analysis of the website: ${url}\n\n` +
+        `ANALYSIS SUMMARY:\n` +
+        `=================\n` +
+        `• Total Interactive Elements Tested: ${totalElements}\n` +
+        `• Bugs Found: ${bugs.length}\n` +
+        `• AI Verified Issues: ${aiVerifiedCount}\n` +
+        `• Analysis Completion Time: ${analysisTime.toFixed(1)} seconds\n` +
+        `• Report Generated: ${new Date().toLocaleString()}\n` +
+        bugDetails +
+        `\nTECHNICAL DETAILS:\n` +
+        `==================\n` +
+        `• Analysis performed using automated browser testing\n` +
+        `• All interactive elements (buttons, links, forms) were tested\n` +
+        `• UI responsiveness and navigation flows were verified\n` +
+        `• Search functionality and dropdown interactions were analyzed\n\n` +
+        `NEXT STEPS:\n` +
+        `===========\n` +
+        (bugs.length > 0
+          ? `1. Review each bug listed above\n` +
+            `2. Prioritize fixes based on severity levels\n` +
+            `3. Test fixes in a staging environment\n` +
+            `4. Re-run analysis after implementing fixes\n`
+          : `1. Great job! Your website is functioning well\n` +
+            `2. Consider regular testing to maintain quality\n` +
+            `3. Monitor user feedback for any missed issues\n`) +
+        `\nFor detailed technical information and screenshots, please refer to the attached PDF report.\n\n` +
+        `Best regards,\n` +
+        `ClickFlow Bug Hunter Team\n` +
+        `Automated Website Testing & Analysis`;
+
+      const body = encodeURIComponent(emailBody);
+
+      // Create Gmail compose URL
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`;
+
+      // Open Gmail compose in new tab
+      window.open(gmailUrl, "_blank");
+
+      // Create a downloadable PDF for manual attachment
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = fileName;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+
+      // Show user instruction with detailed information
+      const alertMessage =
+        bugs.length > 0
+          ? `📧 Gmail compose opened with detailed bug report!\n\n` +
+            `✅ Email includes:\n` +
+            `• Complete analysis summary\n` +
+            `• ${bugs.length} detailed bug descriptions\n` +
+            `• Specific recommendations for each issue\n` +
+            `• Technical analysis information\n\n` +
+            `📎 PDF report downloaded for attachment\n` +
+            `Please attach the downloaded PDF to your email for complete documentation.\n\n` +
+            `Note: Due to browser security, files cannot be auto-attached to Gmail.`
+          : `📧 Gmail compose opened with success report!\n\n` +
+            `✅ Great news: No bugs found!\n` +
+            `The email includes a detailed summary of all tested elements.\n\n` +
+            `📎 PDF report downloaded as backup documentation.`;
+
+      alert(alertMessage);
+    } catch (error) {
+      console.error("Mail PDF failed:", error);
+      alert("Failed to prepare email. Please try again.");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -338,6 +611,15 @@ export const AnalysisResults = ({
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Export PDF
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-slate-300 border-slate-600"
+                  onClick={handleMailPDF}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Mail
                 </Button>
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
                   <FileText className="h-4 w-4 mr-2" />

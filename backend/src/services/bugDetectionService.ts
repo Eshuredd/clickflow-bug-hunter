@@ -1058,6 +1058,557 @@ export async function analyzeButtonClicks(
     }, searchInput);
   }
 
+  /**
+   * Analyze dropdown elements and check for UI changes after interaction
+   */
+  async function analyzeDropdowns(
+    page: Page,
+    currentUrl: string,
+    results: ButtonClickResult[]
+  ) {
+    // Find all dropdown elements
+    const dropdownSelectors = await page.evaluate(() => {
+      const selectors: { selector: string; type: string }[] = [];
+      let idx = 0;
+
+      // Common dropdown patterns
+      const dropdownPatterns = [
+        "select",
+        '[role="combobox"]',
+        '[role="listbox"]',
+        '[aria-haspopup="listbox"]',
+        '[aria-haspopup="menu"]',
+        '[data-state="closed"][data-state="open"]',
+        ".dropdown",
+        '[class*="dropdown"]',
+        '[class*="select"]',
+      ];
+
+      dropdownPatterns.forEach((pattern) => {
+        document.querySelectorAll(pattern).forEach((el) => {
+          if (el instanceof HTMLElement) {
+            const id = `dropdown-${idx++}`;
+            el.setAttribute("data-dropdown-analyzer-id", id);
+            selectors.push({
+              selector: `[data-dropdown-analyzer-id='${id}']`,
+              type: el.tagName.toLowerCase() === "select" ? "native" : "custom",
+            });
+          }
+        });
+      });
+
+      return selectors;
+    });
+
+    for (const { selector, type } of dropdownSelectors) {
+      try {
+        const elementInfo = await page.evaluate(
+          (sel, elType) => {
+            const el = document.querySelector(sel);
+            if (!el) return null;
+            return {
+              label:
+                el.getAttribute("aria-label") ||
+                el.getAttribute("name") ||
+                (el as HTMLElement).textContent?.trim() ||
+                "Dropdown",
+              hasOptions:
+                elType === "native"
+                  ? (el as HTMLSelectElement).options.length > 0
+                  : !!el.querySelector('[role="option"]'),
+            };
+          },
+          selector,
+          type
+        );
+
+        if (!elementInfo || !elementInfo.hasOptions) continue;
+
+        // Capture state before interaction
+        const stateBefore = await captureDetailedState(page);
+
+        // Click the dropdown
+        const clickResult = await robustClick(page, selector);
+        if (!clickResult.success) continue;
+
+        await new Promise((res) => setTimeout(res, 500)); // Wait for dropdown to open
+
+        // For native select, change the value
+        if (type === "native") {
+          await page.evaluate((sel) => {
+            const select = document.querySelector(sel) as HTMLSelectElement;
+            if (select && select.options.length > 1) {
+              select.selectedIndex = 1;
+              select.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+          }, selector);
+        } else {
+          // For custom dropdowns, try to click the first option
+          const optionClicked = await page.evaluate((sel) => {
+            const dropdown = document.querySelector(sel);
+            if (!dropdown) return false;
+
+            const option =
+              dropdown.querySelector(
+                '[role="option"]:not([aria-selected="true"])'
+              ) ||
+              dropdown.querySelector("li:not(.selected)") ||
+              dropdown.querySelector(".dropdown-item:not(.active)");
+
+            if (option) {
+              (option as HTMLElement).click();
+              return true;
+            }
+            return false;
+          }, selector);
+
+          if (!optionClicked) {
+            // Try clicking the dropdown again to close it
+            await robustClick(page, selector);
+          }
+        }
+
+        await new Promise((res) => setTimeout(res, 500));
+
+        // Check if there's a filter/search button nearby
+        const filterButton = await findNearbyFilterButton(page, selector);
+
+        if (filterButton) {
+          // Click the filter button
+          await robustClick(page, filterButton);
+          await new Promise((res) => setTimeout(res, 1000));
+        }
+
+        // Capture state after interaction
+        const stateAfter = await captureDetailedState(page);
+
+        // Check for UI changes
+        const uiChanged = hasSignificantUIChange(stateBefore, stateAfter);
+
+        if (!uiChanged && !filterButton) {
+          console.log(
+            `[BUG][NoDropdownEffect] Dropdown '${elementInfo.label}' selection did not cause any UI change.`
+          );
+          results.push({
+            selector,
+            textContent: elementInfo.label,
+            navigated: false,
+            urlBefore: currentUrl,
+            urlAfter: page.url(),
+            contentChanged: false,
+            bugType: "NoDropdownEffect",
+            description: `Dropdown '${elementInfo.label}' selection did not cause any UI change.`,
+            elementType: "custom",
+            isVisible: true,
+            wasClicked: true,
+          });
+        }
+      } catch (error: any) {
+        console.log(
+          `[BUG][DropdownError] ${error.message} | Selector: ${selector}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Analyze checkbox elements and check for UI changes after interaction
+   */
+  async function analyzeCheckboxes(
+    page: Page,
+    currentUrl: string,
+    results: ButtonClickResult[]
+  ) {
+    // Find all checkbox elements
+    const checkboxSelectors = await page.evaluate(() => {
+      const selectors: string[] = [];
+      let idx = 0;
+
+      // Find checkboxes
+      const checkboxPatterns = [
+        'input[type="checkbox"]',
+        '[role="checkbox"]',
+        "[aria-checked]",
+      ];
+
+      checkboxPatterns.forEach((pattern) => {
+        document.querySelectorAll(pattern).forEach((el) => {
+          if (el instanceof HTMLElement) {
+            // Skip if hidden or disabled
+            const style = window.getComputedStyle(el);
+            if (
+              style.display === "none" ||
+              style.visibility === "hidden" ||
+              el.hasAttribute("disabled") ||
+              el.getAttribute("aria-disabled") === "true"
+            ) {
+              return;
+            }
+
+            const id = `checkbox-${idx++}`;
+            el.setAttribute("data-checkbox-analyzer-id", id);
+            selectors.push(`[data-checkbox-analyzer-id='${id}']`);
+          }
+        });
+      });
+
+      return selectors;
+    });
+
+    // Group checkboxes by their form or container
+    const checkboxGroups = await page.evaluate((selectors) => {
+      const groups: { [key: string]: string[] } = {};
+
+      selectors.forEach((sel) => {
+        const checkbox = document.querySelector(sel);
+        if (!checkbox) return;
+
+        // Find the form or container
+        const form = checkbox.closest("form");
+        const container = checkbox.closest(
+          '[role="group"], .filter-group, .checkbox-group, fieldset'
+        );
+
+        const groupKey = form
+          ? `form-${Array.from(document.forms).indexOf(
+              form as HTMLFormElement
+            )}`
+          : container
+          ? `container-${Array.from(
+              document.querySelectorAll(
+                '[role="group"], .filter-group, .checkbox-group, fieldset'
+              )
+            ).indexOf(container)}`
+          : "no-group";
+
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(sel);
+      });
+
+      return groups;
+    }, checkboxSelectors);
+
+    // Analyze each group
+    for (const [groupKey, groupSelectors] of Object.entries(checkboxGroups)) {
+      if (groupSelectors.length === 0) continue;
+
+      try {
+        // Capture state before interaction
+        const stateBefore = await captureDetailedState(page);
+
+        // Click a few checkboxes in the group
+        const checkboxesToClick = groupSelectors.slice(
+          0,
+          Math.min(3, groupSelectors.length)
+        );
+
+        for (const checkboxSelector of checkboxesToClick) {
+          const clickResult = await robustClick(page, checkboxSelector);
+          if (clickResult.success) {
+            await new Promise((res) => setTimeout(res, 200));
+          }
+        }
+
+        // Check if there's a filter/apply button for this group
+        const filterButton = await findGroupFilterButton(
+          page,
+          groupSelectors[0]
+        );
+
+        let stateAfter;
+
+        if (filterButton) {
+          // Click the filter button
+          await robustClick(page, filterButton);
+          await new Promise((res) => setTimeout(res, 1000));
+          stateAfter = await captureDetailedState(page);
+        } else {
+          // No filter button, check immediate changes
+          await new Promise((res) => setTimeout(res, 500));
+          stateAfter = await captureDetailedState(page);
+        }
+
+        // Check for UI changes
+        const uiChanged = hasSignificantUIChange(stateBefore, stateAfter);
+
+        if (!uiChanged) {
+          const groupLabel = await page.evaluate((sel) => {
+            const checkbox = document.querySelector(sel);
+            const form = checkbox?.closest("form");
+            const fieldset = checkbox?.closest("fieldset");
+            const legend = fieldset?.querySelector("legend");
+
+            return (
+              legend?.textContent?.trim() ||
+              form?.getAttribute("aria-label") ||
+              "Checkbox group"
+            );
+          }, groupSelectors[0]);
+
+          console.log(
+            `[BUG][NoCheckboxEffect] Checkbox group '${groupLabel}' selection did not cause any UI change${
+              filterButton ? " after clicking filter button" : ""
+            }.`
+          );
+
+          results.push({
+            selector: groupSelectors.join(", "),
+            textContent: groupLabel,
+            navigated: false,
+            urlBefore: currentUrl,
+            urlAfter: page.url(),
+            contentChanged: false,
+            bugType: "NoCheckboxEffect",
+            description: `Checkbox group '${groupLabel}' selection did not cause any UI change${
+              filterButton ? " after clicking filter button" : ""
+            }.`,
+            elementType: "custom",
+            isVisible: true,
+            wasClicked: true,
+          });
+        }
+
+        // Uncheck the checkboxes to reset state
+        for (const checkboxSelector of checkboxesToClick) {
+          await robustClick(page, checkboxSelector);
+          await new Promise((res) => setTimeout(res, 100));
+        }
+      } catch (error: any) {
+        console.log(
+          `[BUG][CheckboxError] ${error.message} | Group: ${groupKey}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Capture detailed page state for comparison
+   */
+  async function captureDetailedState(page: Page) {
+    return await page.evaluate(() => ({
+      htmlLength: document.body.outerHTML.length,
+      textContent: document.body.innerText,
+      visibleElements: Array.from(document.querySelectorAll("*")).filter(
+        (el) => {
+          const style = window.getComputedStyle(el);
+          return style.display !== "none" && style.visibility !== "hidden";
+        }
+      ).length,
+      // Capture dynamic content areas
+      dynamicContent: Array.from(
+        document.querySelectorAll("[data-dynamic], .results, .content, main")
+      ).map((el) => ({
+        selector:
+          el.tagName +
+          (el.id ? `#${el.id}` : "") +
+          (el.className ? `.${el.className.split(" ")[0]}` : ""),
+        content: (el as HTMLElement).innerText?.substring(0, 100),
+      })),
+      // Capture aria-live regions
+      liveRegions: Array.from(document.querySelectorAll("[aria-live]")).map(
+        (el) => (el as HTMLElement).innerText
+      ),
+      // Capture expanded states
+      expandedStates: Array.from(
+        document.querySelectorAll("[aria-expanded], [data-state]")
+      ).map((el) => ({
+        id: el.id || el.className,
+        expanded:
+          el.getAttribute("aria-expanded") || el.getAttribute("data-state"),
+      })),
+    }));
+  }
+
+  /**
+   * Check if there's a significant UI change between two states
+   */
+  function hasSignificantUIChange(stateBefore: any, stateAfter: any): boolean {
+    // Check for text content changes (ignoring minor whitespace differences)
+    const textChanged =
+      Math.abs(stateBefore.textContent.length - stateAfter.textContent.length) >
+      10;
+
+    // Check for HTML structure changes
+    const htmlChanged =
+      Math.abs(stateBefore.htmlLength - stateAfter.htmlLength) > 50;
+
+    // Check for visible element count changes
+    const elementCountChanged =
+      Math.abs(stateBefore.visibleElements - stateAfter.visibleElements) > 2;
+
+    // Check for dynamic content changes
+    const dynamicContentChanged =
+      JSON.stringify(stateBefore.dynamicContent) !==
+      JSON.stringify(stateAfter.dynamicContent);
+
+    // Check for live region updates
+    const liveRegionChanged =
+      JSON.stringify(stateBefore.liveRegions) !==
+      JSON.stringify(stateAfter.liveRegions);
+
+    // Check for expanded state changes
+    const expandedStateChanged =
+      JSON.stringify(stateBefore.expandedStates) !==
+      JSON.stringify(stateAfter.expandedStates);
+
+    return (
+      textChanged ||
+      htmlChanged ||
+      elementCountChanged ||
+      dynamicContentChanged ||
+      liveRegionChanged ||
+      expandedStateChanged
+    );
+  }
+
+  /**
+   * Find a filter/search button near a dropdown or checkbox group
+   */
+  async function findNearbyFilterButton(
+    page: Page,
+    elementSelector: string
+  ): Promise<string | null> {
+    return await page.evaluate((selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+
+      // Look for filter/search/apply buttons
+      const buttonPatterns = [
+        "filter",
+        "search",
+        "apply",
+        "update",
+        "submit",
+        "go",
+        "refresh",
+      ];
+
+      // Search in the parent form first
+      const form = element.closest("form");
+      if (form) {
+        const buttons = Array.from(
+          form.querySelectorAll('button, input[type="submit"], [role="button"]')
+        );
+        for (const btn of buttons) {
+          const text = (btn as HTMLElement).textContent?.toLowerCase() || "";
+          const ariaLabel = btn.getAttribute("aria-label")?.toLowerCase() || "";
+
+          if (
+            buttonPatterns.some(
+              (pattern) => text.includes(pattern) || ariaLabel.includes(pattern)
+            )
+          ) {
+            if (!btn.hasAttribute("data-analyzer-id")) {
+              btn.setAttribute(
+                "data-analyzer-id",
+                `filter-btn-${Math.random()}`
+              );
+            }
+            return `[data-analyzer-id='${btn.getAttribute(
+              "data-analyzer-id"
+            )}']`;
+          }
+        }
+      }
+
+      // Search in nearby containers
+      const container = element.closest(
+        '.filter-container, .search-container, [role="search"], section'
+      );
+      if (container) {
+        const buttons = Array.from(
+          container.querySelectorAll(
+            'button, input[type="submit"], [role="button"]'
+          )
+        );
+        for (const btn of buttons) {
+          const text = (btn as HTMLElement).textContent?.toLowerCase() || "";
+          const ariaLabel = btn.getAttribute("aria-label")?.toLowerCase() || "";
+
+          if (
+            buttonPatterns.some(
+              (pattern) => text.includes(pattern) || ariaLabel.includes(pattern)
+            )
+          ) {
+            if (!btn.hasAttribute("data-analyzer-id")) {
+              btn.setAttribute(
+                "data-analyzer-id",
+                `filter-btn-${Math.random()}`
+              );
+            }
+            return `[data-analyzer-id='${btn.getAttribute(
+              "data-analyzer-id"
+            )}']`;
+          }
+        }
+      }
+
+      return null;
+    }, elementSelector);
+  }
+
+  /**
+   * Find a filter button for a checkbox group
+   */
+  async function findGroupFilterButton(
+    page: Page,
+    checkboxSelector: string
+  ): Promise<string | null> {
+    return await page.evaluate((selector) => {
+      const checkbox = document.querySelector(selector);
+      if (!checkbox) return null;
+
+      // Find the form or fieldset containing the checkbox
+      const form = checkbox.closest("form");
+      const fieldset = checkbox.closest("fieldset");
+      const container =
+        form || fieldset || checkbox.closest(".filter-group, .checkbox-group");
+
+      if (!container) return null;
+
+      // Look for submit/filter buttons within the container
+      const buttons = Array.from(
+        container.querySelectorAll(
+          'button, input[type="submit"], [role="button"]'
+        )
+      );
+
+      for (const btn of buttons) {
+        const text = (btn as HTMLElement).textContent?.toLowerCase() || "";
+        const value = (btn as HTMLInputElement).value?.toLowerCase() || "";
+        const ariaLabel = btn.getAttribute("aria-label")?.toLowerCase() || "";
+
+        // Check for filter-related text
+        const filterKeywords = [
+          "apply",
+          "filter",
+          "search",
+          "update",
+          "submit",
+          "go",
+        ];
+        if (
+          filterKeywords.some(
+            (keyword) =>
+              text.includes(keyword) ||
+              value.includes(keyword) ||
+              ariaLabel.includes(keyword)
+          )
+        ) {
+          if (!btn.hasAttribute("data-analyzer-id")) {
+            btn.setAttribute(
+              "data-analyzer-id",
+              `group-filter-btn-${Math.random()}`
+            );
+          }
+          return `[data-analyzer-id='${btn.getAttribute("data-analyzer-id")}']`;
+        }
+      }
+
+      return null;
+    }, checkboxSelector);
+  }
+
   // Update the analyzeSearchFields function
   async function analyzeSearchFields(
     page: Page,
@@ -1206,15 +1757,20 @@ export async function analyzeButtonClicks(
     }
     visited.add(normalizedUrl);
 
-    // Ensure consistent sidebar state before testing elements
     await ensureConsistentSidebarState(page);
 
     await injectAnalyzerAttributes(page);
+
+    // Analyze form elements first
     await analyzeSearchFields(page, currentUrl, results);
+    await analyzeDropdowns(page, currentUrl, results);
+    await analyzeCheckboxes(page, currentUrl, results);
+
     if (await isAuthPage(page)) {
       await handleAuthPage(page, results, currentUrl, visited, checkedElements);
       return;
     }
+
     const clickableElements = await getClickableSelectors(page);
     const footerTestedSet = new Set<string>();
     for (let i = 0; i < clickableElements.length; i++) {
@@ -1419,8 +1975,14 @@ export async function analyzeButtonClicks(
         const stateBefore = await page.evaluate(() => ({
           htmlLength: document.body.outerHTML.length,
           expanded: Array.from(
-            document.querySelectorAll("[aria-expanded]")
-          ).map((el) => el.getAttribute("aria-expanded")),
+            document.querySelectorAll(
+              "[aria-expanded], [data-state], .expanded, .collapsed, .open, .closed"
+            )
+          ).map((el) => ({
+            expanded: el.getAttribute("aria-expanded"),
+            state: el.getAttribute("data-state"),
+            classList: Array.from(el.classList).join(" "),
+          })),
           textContent: document.body.innerText,
         }));
         // Use robust click implementation with fallbacks
@@ -1489,31 +2051,41 @@ export async function analyzeButtonClicks(
             continue;
           }
         }
-        // After click, quick check for UI changes - reduced wait time
+        // After click, quick check for UI changes
         await new Promise((res) => setTimeout(res, 300));
         const stateAfter = await page.evaluate(() => ({
           htmlLength: document.body.outerHTML.length,
           expanded: Array.from(
-            document.querySelectorAll("[aria-expanded]")
-          ).map((el) => el.getAttribute("aria-expanded")),
+            document.querySelectorAll(
+              "[aria-expanded], [data-state], .expanded, .collapsed, .open, .closed"
+            )
+          ).map((el) => ({
+            expanded: el.getAttribute("aria-expanded"),
+            state: el.getAttribute("data-state"),
+            classList: Array.from(el.classList).join(" "),
+          })),
           textContent: document.body.innerText,
         }));
+
         const htmlDiff = Math.abs(
           stateBefore.htmlLength - stateAfter.htmlLength
         );
         let contentChanged = false;
+
+        // Enhanced dropdown state detection
+        const dropdownStateChanged =
+          JSON.stringify(stateBefore.expanded) !==
+          JSON.stringify(stateAfter.expanded);
+
         if (detectionLevel === "expert") {
           contentChanged =
             htmlDiff > 20 ||
             stateBefore.textContent !== stateAfter.textContent ||
-            JSON.stringify(stateBefore.expanded) !==
-              JSON.stringify(stateAfter.expanded);
+            dropdownStateChanged;
         } else {
-          // fallback to previous logic for other levels
           contentChanged =
             stateBefore.htmlLength !== stateAfter.htmlLength ||
-            JSON.stringify(stateBefore.expanded) !==
-              JSON.stringify(stateAfter.expanded);
+            dropdownStateChanged;
         }
         if (!navigated && !error && !contentChanged) {
           const isLinkToCurrentPage =
