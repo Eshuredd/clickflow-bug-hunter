@@ -2230,23 +2230,46 @@ export async function analyzeButtonClicks(
         puppeteerConfig.executablePath = process.env.CHROME_BIN;
       }
 
-      console.log('🚀 Launching Chrome with config:', {
-        executablePath: puppeteerConfig.executablePath || 'default',
+      console.log("🚀 Launching Chrome with config:", {
+        executablePath: puppeteerConfig.executablePath || "default",
         argsCount: puppeteerConfig.args.length,
-        headless: puppeteerConfig.headless
+        headless: puppeteerConfig.headless,
       });
-      
+
       browser = await puppeteer.launch(puppeteerConfig);
-      console.log('✅ Chrome launched successfully');
-      
+      console.log("✅ Chrome launched successfully");
+
       const page = await browser.newPage();
+      console.log("📄 Creating new page...");
+
+      // Wait for page to be fully initialized
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       await page.setUserAgent(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
       );
+
+      // Set viewport and other page settings
+      await page.setViewport({ width: 1366, height: 768 });
+
       const results: ButtonClickResult[] = [];
       const visited = new Set<string>();
       const checkedElements = new Set<string>();
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+
+      console.log(`🌐 Navigating to: ${url}`);
+
+      // Enhanced page navigation with better error handling
+      try {
+        await page.goto(url, {
+          waitUntil: "domcontentloaded",
+          timeout: 20000,
+        });
+        console.log("✅ Page loaded successfully");
+      } catch (gotoError) {
+        const error = gotoError as Error;
+        console.error("❌ Navigation failed:", error.message);
+        throw new Error(`Failed to navigate to ${url}: ${error.message}`);
+      }
       await new Promise((res) => setTimeout(res, 1000));
 
       // Initialize consistent UI state for testing
