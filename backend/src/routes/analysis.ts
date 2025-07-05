@@ -100,6 +100,40 @@ router.get("/status", (req: any, res: any) => {
   });
 });
 
+// Browser health check endpoint
+router.get("/health", async (req: any, res: any) => {
+  try {
+    const puppeteer = require("puppeteer");
+
+    // Quick browser test
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      timeout: 10000,
+      protocolTimeout: 10000,
+    });
+
+    const page = await browser.newPage();
+    await page.goto("data:text/html,<h1>Health Check</h1>", { timeout: 5000 });
+    await browser.close();
+
+    res.json({
+      service: "analysis",
+      browser: "healthy",
+      chrome: process.env.PUPPETEER_EXECUTABLE_PATH || "default",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Browser health check failed:", error);
+    res.status(500).json({
+      service: "analysis",
+      browser: "unhealthy",
+      error: (error as Error).message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 // SSE endpoint for button click analysis
 router.get("/button-clicks/stream", async (req: any, res: any) => {
   const { url } = req.query;
@@ -139,7 +173,7 @@ router.post("/button-clicks", async (req: any, res: any) => {
   if (!url) return res.status(400).json({ error: "URL is required" });
 
   // Set response timeout to prevent gateway timeouts
-  const timeoutMs = 25000; // 25 seconds (less than typical 30s gateway timeout)
+  const timeoutMs = 90000; // 90 seconds (allow time for Puppeteer operations)
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(
       () =>

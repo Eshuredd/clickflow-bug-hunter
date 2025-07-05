@@ -2283,10 +2283,27 @@ export async function analyzeButtonClicks(
           "--disable-preconnect",
           "--disable-print-preview",
           "--disable-component-update",
+          "--disable-domain-reliability",
+          "--disable-client-side-phishing-detection",
+          "--disable-hang-monitor",
+          "--disable-popup-blocking",
+          "--disable-prompt-on-repost",
+          "--disable-sync",
+          "--disable-web-resources",
+          "--disable-permissions-api",
+          "--disable-notifications",
+          "--disable-desktop-notifications",
+          "--disable-file-system",
+          "--disable-web-security",
+          "--allow-running-insecure-content",
+          "--disable-blink-features=AutomationControlled",
+          "--disable-dev-shm-usage",
+          "--memory-pressure-off",
+          "--max_old_space_size=4096",
         ],
         // Enhanced timeout settings for Docker
-        timeout: 30000,
-        protocolTimeout: 30000,
+        timeout: 60000,
+        protocolTimeout: 60000,
         // Do NOT set userDataDir to ensure a fresh profile is used
       };
 
@@ -2306,11 +2323,87 @@ export async function analyzeButtonClicks(
       browser = await puppeteer.launch(puppeteerConfig);
       console.log("✅ Chrome launched successfully");
 
-      const page = await browser.newPage();
       console.log("📄 Creating new page...");
+      let page: Page;
+
+      try {
+        console.log("🔄 Creating new page...");
+        page = await browser.newPage();
+        console.log("✅ Page created successfully");
+
+        // Add debugging for page events
+        page.on("error", (err) => {
+          console.error("🚨 Page error:", err);
+        });
+
+        page.on("pageerror", (err) => {
+          console.error("🚨 Page error event:", err);
+        });
+
+        page.on("requestfailed", (req) => {
+          console.warn(
+            "⚠️ Request failed:",
+            req.url(),
+            req.failure()?.errorText
+          );
+        });
+      } catch (pageError) {
+        console.error("❌ Failed to create page:", pageError);
+        throw new Error(`Failed to create page: ${pageError}`);
+      }
+
+      try {
+        // Set page timeouts to match our configuration
+        console.log("🔄 Setting page timeouts...");
+        page.setDefaultTimeout(60000);
+        page.setDefaultNavigationTimeout(60000);
+        console.log("⏱️ Page timeouts set to 60 seconds");
+
+        // Test page responsiveness with a simple operation
+        console.log("🔄 Testing page responsiveness...");
+        await page.evaluate(() => {
+          return new Promise((resolve) => {
+            setTimeout(() => resolve(true), 100);
+          });
+        });
+        console.log("✅ Page is responsive");
+      } catch (timeoutError: any) {
+        console.error(
+          "❌ Failed to set page timeouts or test responsiveness:",
+          timeoutError
+        );
+
+        // If it's a Network.enable timeout, try to recover
+        if (
+          timeoutError.message &&
+          timeoutError.message.includes("Network.enable")
+        ) {
+          console.log(
+            "🔄 Detected Network.enable timeout, attempting recovery..."
+          );
+
+          // Close the current page and try again
+          try {
+            await page.close();
+          } catch (closeError) {
+            console.warn("⚠️ Could not close problematic page:", closeError);
+          }
+
+          // Create a new page with minimal configuration
+          console.log("🔄 Creating new page with minimal configuration...");
+          page = await browser.newPage();
+
+          // Set only essential timeouts
+          page.setDefaultTimeout(60000);
+          page.setDefaultNavigationTimeout(60000);
+          console.log("✅ Recovery successful");
+        } else {
+          throw new Error(`Failed to set page timeouts: ${timeoutError}`);
+        }
+      }
 
       // Wait for page to be fully initialized
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Check if page is still valid before setting properties
       if (page.isClosed()) {
@@ -2348,7 +2441,7 @@ export async function analyzeButtonClicks(
         () =>
           page.goto(url, {
             waitUntil: "domcontentloaded",
-            timeout: 20000,
+            timeout: 45000, // Increased timeout for Docker
           }),
         "navigation"
       );
