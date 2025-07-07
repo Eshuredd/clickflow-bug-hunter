@@ -1,7 +1,12 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +28,9 @@ const Auth = () => {
   useEffect(() => {
     // Check if user is already logged in
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
         navigate("/");
       }
@@ -44,15 +51,16 @@ const Auth = () => {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: fullName,
-          }
-        }
+          },
+        },
       });
 
       if (error) throw error;
 
       toast({
         title: "Check your email",
-        description: "We've sent you a confirmation link to complete your signup.",
+        description:
+          "We've sent you a confirmation link to complete your signup.",
       });
     } catch (error: any) {
       setError(error.message);
@@ -96,7 +104,7 @@ const Auth = () => {
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">CB</span>
             </div>
-            <h1 className="text-xl font-bold text-white">ClickBug Detector</h1>
+            <h1 className="text-xl font-bold text-white">AIGIS AI</h1>
           </div>
           <CardTitle className="text-white">Welcome</CardTitle>
           <CardDescription className="text-slate-400">
@@ -106,10 +114,16 @@ const Auth = () => {
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-slate-700">
-              <TabsTrigger value="signin" className="data-[state=active]:bg-slate-600">
+              <TabsTrigger
+                value="signin"
+                className="data-[state=active]:bg-slate-600"
+              >
                 Sign In
               </TabsTrigger>
-              <TabsTrigger value="signup" className="data-[state=active]:bg-slate-600">
+              <TabsTrigger
+                value="signup"
+                className="data-[state=active]:bg-slate-600"
+              >
                 Sign Up
               </TabsTrigger>
             </TabsList>
@@ -117,14 +131,18 @@ const Auth = () => {
             {error && (
               <Alert className="mt-4 border-red-500/20 bg-red-500/10">
                 <AlertCircle className="h-4 w-4 text-red-400" />
-                <AlertDescription className="text-red-400">{error}</AlertDescription>
+                <AlertDescription className="text-red-400">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
 
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email" className="text-slate-300">Email</Label>
+                  <Label htmlFor="signin-email" className="text-slate-300">
+                    Email
+                  </Label>
                   <Input
                     id="signin-email"
                     type="email"
@@ -136,7 +154,9 @@ const Auth = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password" className="text-slate-300">Password</Label>
+                  <Label htmlFor="signin-password" className="text-slate-300">
+                    Password
+                  </Label>
                   <Input
                     id="signin-password"
                     type="password"
@@ -167,7 +187,9 @@ const Auth = () => {
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name" className="text-slate-300">Full Name</Label>
+                  <Label htmlFor="signup-name" className="text-slate-300">
+                    Full Name
+                  </Label>
                   <Input
                     id="signup-name"
                     type="text"
@@ -179,7 +201,9 @@ const Auth = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email" className="text-slate-300">Email</Label>
+                  <Label htmlFor="signup-email" className="text-slate-300">
+                    Email
+                  </Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -191,7 +215,9 @@ const Auth = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password" className="text-slate-300">Password</Label>
+                  <Label htmlFor="signup-password" className="text-slate-300">
+                    Password
+                  </Label>
                   <Input
                     id="signup-password"
                     type="password"

@@ -47,7 +47,7 @@ export const Header = () => {
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">CB</span>
               </div>
-              <h1 className="text-xl font-bold text-white">ClickBug Detector</h1>
+              <h1 className="text-xl font-bold text-white">AEGIS AI</h1>
             </div>
             {user && (
               <Badge variant="secondary" className={getSubscriptionBadgeColor()}>
